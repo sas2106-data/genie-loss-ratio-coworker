@@ -1,0 +1,11 @@
+claim_id,cause_of_loss,ai_peril,peril_consistent,pii_detected,loss_description_masked
+CLM-3075727,Heavy Weather,cargo damage,false,false,Storm at sea damaged deck cargo bound for Zurich
+CLM-3075754,Theft,vehicle collision,false,false,"Delivery van rear-ended at traffic lights in Nantes, bumper and tailgate damaged"
+CLM-3075958,Theft,vehicle collision,false,false,"Delivery van rear-ended at traffic lights in Liège, bumper and tailgate damaged"
+CLM-3075766,Heavy Weather,cargo damage,false,false,Storm at sea damaged deck cargo bound for Madrid
+CLM-3076053,Water Damage,fire,false,false,Kitchen fire spread to the dining area of the insured restaurant in Nantes
+CLM-3076160,Theft,vehicle collision,false,false,"Delivery van rear-ended at traffic lights in Zurich, bumper and tailgate damaged"
+CLM-3076215,Theft,vehicle collision,false,false,"Delivery van rear-ended at traffic lights in Nantes, bumper and tailgate damaged"
+CLM-3076234,Professional Error,bodily injury,false,false,Visitor slipped on a wet floor at the Manchester premises and fractured a wrist
+CLM-3076286,Product Liability,third-party property damage,false,false,Customer claims our heating unit overheated and damaged their Munich shop
+CLM-3076293,Property Damage,professional error,false,false,Our engineers damaged a client's server room flooring during installation in Nantes

@@ -1,0 +1,7 @@
+line_of_business,region,status,primary_driver,lr_7d,lr_30d,target,gap_7d_pts
+Property,DACH,RED,Catastrophe event,2.659,0.981,0.6,205.9
+Liability,Southern Europe,RED,Large loss,2.09,0.94,0.66,143.0
+Motor,UK & Ireland,RED,Frequency,1.035,0.841,0.7,33.5
+Liability,UK & Ireland,AMBER,Within normal variation,0.795,0.666,0.66,13.5
+Property,UK & Ireland,AMBER,Within normal variation,0.728,0.593,0.6,12.8
+Liability,France,AMBER,Frequency,0.768,0.584,0.66,10.8

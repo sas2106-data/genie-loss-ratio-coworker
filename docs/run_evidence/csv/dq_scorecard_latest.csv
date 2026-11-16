@@ -1,0 +1,4 @@
+report_date,check_name,check_type,severity,issues,records_checked,pass_rate
+2026-11-16,pii_in_free_text,Gen AI,High,4,148,0.973
+2026-11-16,peril_mismatch,Gen AI,High,4,148,0.973
+2026-11-16,negative_amount,Rule,Medium,2,148,0.9865

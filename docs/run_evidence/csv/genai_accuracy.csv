@@ -1,0 +1,3 @@
+check_name,genai_function,claims_checked,seeded_defects,flagged,true_positives,false_positives,false_negatives,precision,recall,f1
+peril_mismatch,ai_classify,1981,21,47,21,26,0,0.447,1.0,0.618
+pii_in_free_text,ai_mask,1981,70,87,70,17,0,0.805,1.0,0.892

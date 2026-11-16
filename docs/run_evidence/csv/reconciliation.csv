@@ -1,0 +1,2 @@
+from_date,to_date,lakeflow_incurred,original_incurred,incurred_diff_pct,lakeflow_loss_ratio,original_loss_ratio
+2026-10-18,2026-11-16,1.39697699E8,1.44002524E8,-2.99,0.6721,0.6712

@@ -1,0 +1,9 @@
+team,status,actions
+Claims,ACKNOWLEDGED,1
+Claims,IN_PROGRESS,1
+Claims,OPEN,2
+Finance,OPEN,1
+Pricing,OPEN,2
+Reinsurance,OPEN,2
+Reserving,OPEN,1
+Underwriting,OPEN,6

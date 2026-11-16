@@ -1,0 +1,3 @@
+rate_action_id,line_of_business,region,rate_change_pct,status,reason
+RA-LR-20261116-MOT-UK,Motor,UK & Ireland,7.5,PROPOSED,"RED on loss ratio, driver Frequency: Test whether the frequency trend is in the rating model and price a frequency load if it persists."
+RA-LR-20261116-LIA-FRAN,Liability,France,7.5,PROPOSED,"AMBER on loss ratio, driver Frequency: Test whether the frequency trend is in the rating model and price a frequency load if it persists."

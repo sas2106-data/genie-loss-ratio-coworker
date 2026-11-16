@@ -24,6 +24,15 @@ TABLES = {
     "lr_targets": "Plan loss ratio, expense ratio, alert thresholds and owner team per line of business.",
 }
 
+# Added when the Lakeflow / Gen AI / Lakebase scenario has run (resources/lrc_jobs.yml → lrc_end_to_end)
+EXTENDED_TABLES = {
+    "dq_daily_scorecard": "Daily data-quality scorecard from the Lakeflow pipeline: records checked, issues and pass rate per check (rule-based and Gen AI).",
+    "dq_claims_issues": "One row per claim data-quality issue (peril mismatch found by ai_classify, personal data found by ai_mask, negative amounts, date and currency errors) with an ai_query explanation and suggested fix. Personal data is masked.",
+    "lr_action_status": "Team status of each loss-ratio action (OPEN, ACKNOWLEDGED, IN_PROGRESS, DONE) with owner and note, snapshotted from the Lakebase operational store.",
+    "gold_rate_adequacy": "Rate adequacy per line of business and region: 30-day loss ratio vs target, quotes, bind ratio and average rate change from the Lakebase pricing system, and proposed rate actions.",
+    "gold_daily_loss_run_lf": "Daily loss run built by the Lakeflow pipeline from the raw files (same shape as gold_daily_loss_run).",
+}
+
 INSTRUCTIONS = """\
 You are the loss-ratio coworker for the CUO, CFO and underwriting leaders of a European commercial P&C insurer. Currency is EUR. Data is synthetic.
 
@@ -39,6 +48,9 @@ How to answer:
 - When asked "what should we do" or "who needs to act", read lr_action_recommendations for the latest alerts and group by team.
 - When asked how we compare with the market, use industry_benchmarks and always name the source and basis (e.g. AM Best FY2025 US P&C 92.9%). Do not present benchmarks as targets.
 - Format ratios as percentages with one decimal and money as EUR with k/m suffixes. Keep answers short enough to read on a phone.
+- Data quality: use dq_daily_scorecard for pass rates and dq_claims_issues for the issues and their ai_explanation. Never show unmasked personal data.
+- Team status: use lr_action_status for whether an action is OPEN, ACKNOWLEDGED, IN_PROGRESS or DONE, its owner and note (updated by teams in the Action Desk app on Lakebase).
+- Pricing: use gold_rate_adequacy for rate adequacy, bind ratio and proposed rate actions per segment.
 """
 
 SAMPLE_QUESTIONS = [
@@ -48,6 +60,11 @@ SAMPLE_QUESTIONS = [
     "What actions are recommended for the Claims team today?",
     "How does our year-to-date combined ratio compare with the US P&C industry and the Global Insurance Customer?",
     "Show the 30-day loss ratio by line of business against target.",
+]
+EXTENDED_QUESTIONS = [
+    "Which data-quality checks failed today and why?",
+    "Which actions are still open for Reinsurance and who owns them?",
+    "Where is the loss ratio above target with no rate increase?",
 ]
 
 EXAMPLE_SQL = [
@@ -67,17 +84,39 @@ EXAMPLE_SQL = [
 ]
 
 
+def _exists(name: str) -> bool:
+    try:
+        cli("tables", "get", fq(name))
+        return True
+    except SystemExit:
+        return False
+
+
 def serialized_space() -> dict:
+    tables = dict(TABLES)
+    extra = {t: d for t, d in EXTENDED_TABLES.items() if _exists(t)}
+    tables.update(extra)
+    questions = SAMPLE_QUESTIONS + (EXTENDED_QUESTIONS if extra else [])
+    examples = list(EXAMPLE_SQL)
+    if "dq_daily_scorecard" in extra:
+        examples.append(("Which data-quality checks failed today and why?",
+                         f"SELECT s.check_name, s.check_type, s.issues, s.pass_rate, ANY_VALUE(i.ai_explanation) AS example_explanation "
+                         f"FROM {fq('dq_daily_scorecard')} s LEFT JOIN {fq('dq_claims_issues')} i USING (report_date, check_name) "
+                         f"WHERE s.report_date = (SELECT MAX(report_date) FROM {fq('dq_daily_scorecard')}) GROUP BY ALL ORDER BY s.issues DESC"))
+    if "lr_action_status" in extra:
+        examples.append(("Which actions are still open for Reinsurance?",
+                         f"SELECT line_of_business, region, priority, action, due_within, status, owner, note FROM {fq('lr_action_status')} "
+                         f"WHERE team = 'Reinsurance' AND status <> 'DONE' ORDER BY priority, as_of_date DESC"))
     return {
         "version": 2,
         "config": {"sample_questions": sorted(
-            [{"id": new_id(), "question": [q]} for q in SAMPLE_QUESTIONS], key=lambda x: x["id"])},
+            [{"id": new_id(), "question": [q]} for q in questions], key=lambda x: x["id"])},
         "data_sources": {"tables": sorted(
-            [{"identifier": fq(t), "description": [d]} for t, d in TABLES.items()], key=lambda x: x["identifier"])},
+            [{"identifier": fq(t), "description": [d]} for t, d in tables.items()], key=lambda x: x["identifier"])},
         "instructions": {
             "text_instructions": [{"id": new_id(), "content": [INSTRUCTIONS]}],
             "example_question_sqls": sorted(
-                [{"id": new_id(), "question": [q], "sql": [s]} for q, s in EXAMPLE_SQL], key=lambda x: x["id"]),
+                [{"id": new_id(), "question": [q], "sql": [s]} for q, s in examples], key=lambda x: x["id"]),
         },
     }
 

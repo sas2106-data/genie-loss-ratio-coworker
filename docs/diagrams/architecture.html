@@ -1,0 +1,105 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Genie Loss Ratio Coworker · architecture</title>
+<style>
+  body{margin:0;background:#fff;font-family:"DM Sans",Helvetica,Arial,sans-serif;color:#1B3139}
+  #c{position:relative;width:1600px;height:880px}
+  .t{position:absolute;left:40px;top:22px;font-size:26px;font-weight:700}
+  .st{position:absolute;left:40px;top:58px;font-size:15px;color:#5b6b73}
+  .zone{position:absolute;border:1.5px dashed #c9d3d8;border-radius:14px}
+  .zl{position:absolute;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5b6b73;background:#fff;padding:0 6px;top:-9px;left:14px}
+  .b{position:absolute;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.35;box-sizing:border-box;border:1.5px solid}
+  .b h{display:block;font-weight:700;font-size:13.5px;margin-bottom:3px}
+  .n{display:inline-block;width:20px;height:20px;border-radius:50%;background:#1B3139;color:#fff;font-size:11.5px;font-weight:700;text-align:center;line-height:20px;margin-right:6px}
+  .src{background:#f6f8f9;border-color:#8a9aa2}
+  .uc{background:#e9f8f2;border-color:#00A972}
+  .lf{background:#e7f1fb;border-color:#2272B4}
+  .ai{background:#f3ecfb;border-color:#7B3FC4}
+  .lb{background:#fff7e3;border-color:#F2A900}
+  .ge{background:#fff1ee;border-color:#FF3621}
+  .one{background:#FF3621;border-color:#b3260f;color:#fff}
+  .job{background:#1B3139;border-color:#1B3139;color:#fff}
+  .ppl{background:#fff;border-color:#1B3139}
+  svg{position:absolute;left:0;top:0}
+  .lab{position:absolute;font-size:11.5px;color:#3d4f57;background:#fff;padding:1px 4px;border-radius:4px}
+  .k{font-family:Menlo,monospace;font-size:11px}
+</style></head><body><div id="c">
+<div class="t">Genie Loss Ratio Coworker · end-to-end architecture</div>
+<div class="st">Raw files → Lakeflow with Gen AI data quality → one governed loss-ratio definition → Genie answers, Lakebase acts. One Asset Bundle, one daily Lakeflow Job. Synthetic data.</div>
+
+<!-- zones -->
+<div class="zone" style="left:30px;top:100px;width:200px;height:560px"><span class="zl">Sources</span></div>
+<div class="zone" style="left:250px;top:100px;width:930px;height:400px"><span class="zl">Unity Catalog · governed lakehouse (Delta)</span></div>
+<div class="zone" style="left:428px;top:150px;width:482px;height:262px;border-color:#9cc3e6"><span class="zl" style="color:#2272B4">Lakeflow Spark Declarative Pipeline · serverless</span></div>
+<div class="zone" style="left:250px;top:530px;width:930px;height:200px;border-color:#f2cf73"><span class="zl" style="color:#9a6b00">Lakebase · managed Postgres (operational, low latency)</span></div>
+<div class="zone" style="left:1200px;top:100px;width:370px;height:630px"><span class="zl">Where people work</span></div>
+
+<!-- sources -->
+<div class="b src" style="left:45px;top:130px;width:170px;height:78px"><h>Claims FNOL feed</h>JSON, free-text loss descriptions</div>
+<div class="b src" style="left:45px;top:240px;width:170px;height:66px"><h>Premium bordereaux</h>CSV, daily earned premium</div>
+<div class="b src" style="left:45px;top:560px;width:170px;height:78px"><h>Pricing desk</h>quotes, referrals, rate decisions</div>
+
+<!-- UC -->
+<div class="b uc" style="left:285px;top:180px;width:130px;height:92px"><h><span class="n">1</span>Raw volume</h><span class="k">/Volumes/…/raw</span><br>dated folders</div>
+<div class="b lf" style="left:440px;top:180px;width:140px;height:92px"><h><span class="n">2</span>Bronze</h>Auto Loader<br><span class="k">read_files</span> stream</div>
+<div class="b lf" style="left:605px;top:180px;width:150px;height:92px"><h>Silver</h>expectations: EUR, no negatives, dates; de-dup resends</div>
+<div class="b ai" style="left:440px;top:300px;width:315px;height:100px"><h><span class="n">3</span>Gen AI data quality</h><span class="k">ai_classify</span> peril vs coded cause · <span class="k">ai_mask</span> names, phones, emails · <span class="k">ai_query</span> explains each issue and the fix</div>
+<div class="b lf" style="left:775px;top:180px;width:120px;height:220px"><h>Gold</h>loss run (Lakeflow)<br><br>DQ scorecard + issues<br><br>rate adequacy:<br>indicated vs achieved rate</div>
+<div class="b uc" style="left:930px;top:180px;width:235px;height:307px"><h><span class="n">4</span>Semantic layer</h>metric views <span class="k">mv_loss_ratio</span>, <span class="k">mv_loss_run</span>: one loss-ratio definition for every surface<br><br>Genie Ontology: synonyms, comments, tags, targets, owners<br><br>RAG watchlist, alerts and the action playbook (daily watch job)<br><br>DQ scorecard, rate adequacy and team status exposed to Genie</div>
+<div class="b uc" style="left:440px;top:425px;width:455px;height:62px"><h>Delta snapshots of Lakebase (what teams did today)</h><span class="k">lr_action_status · bronze_pricing_quotes · bronze_rate_actions</span></div>
+<div class="b uc" style="left:285px;top:425px;width:130px;height:62px;font-size:11.5px"><h style="font-size:12px">Lineage · tags · grants</h>on every table</div>
+
+<!-- Lakebase -->
+<div class="b lb" style="left:285px;top:565px;width:250px;height:90px"><h><span class="n">5</span>pricing schema</h><span class="k">quotes</span> (24k+ transactions)<br><span class="k">rate_actions</span> proposed by the coworker, decided by Pricing</div>
+<div class="b lb" style="left:575px;top:565px;width:270px;height:90px"><h>ops schema</h><span class="k">lr_actions</span>: one row per team action, status OPEN → ACKNOWLEDGED → IN_PROGRESS → DONE, owner, note</div>
+<div class="b lb" style="left:885px;top:565px;width:280px;height:90px"><h>Synced table</h><span class="k">lr_watchlist_serving</span>: today's RAG status from Delta, read in milliseconds by the app</div>
+
+<!-- people -->
+<div class="b ge" style="left:1220px;top:130px;width:330px;height:84px"><h><span class="n">6</span>Genie Agent · Loss Ratio Coworker</h>why did it move · which DQ checks failed · what is still open · where is rate inadequate</div>
+<div class="b ge" style="left:1220px;top:232px;width:330px;height:56px"><h>AI/BI dashboard · Daily Loss Ratio Watch</h></div>
+<div class="b one" style="left:1220px;top:306px;width:330px;height:76px"><h>Genie One skill · 07:30 weekdays</h>Slack brief to the exec channel · one Gmail draft per team</div>
+<div class="b lb" style="left:1220px;top:440px;width:330px;height:100px;border-width:2px"><h>Databricks App · Action Desk</h>team leads acknowledge, own and close actions; Pricing approves or rejects proposed rate actions. Writes are Postgres transactions.</div>
+<div class="b ppl" style="left:1220px;top:590px;width:330px;height:100px"><h>Claims · Underwriting · Pricing · Reinsurance · Reserving · Finance</h>same morning, same number, owned actions with due dates</div>
+
+<!-- job -->
+<div class="b job" style="left:30px;top:755px;width:1540px;height:100px;font-size:13px">
+<h style="font-size:14.5px">Lakeflow Job <span class="k" style="color:#9fe0c6">lrc_end_to_end</span> · 06:30 weekdays · defined in one Declarative Automation Bundle (pipeline, Lakebase instance, app, jobs)</h>
+generate loss run → semantic layer → land raw files → daily watch (detect RED/AMBER, ask Genie why, playbook) → Lakebase setup → publish actions + record quotes + propose rate actions + sync watchlist → snapshot Lakebase to Delta → Lakeflow pipeline (bronze → silver → Gen AI DQ → gold) · run evidence committed in <span class="k" style="color:#9fe0c6">docs/run_evidence/</span></div>
+
+<svg width="1600" height="900"><defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#5b6b73"/></marker>
+<marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#c98f00"/></marker></defs>
+<g fill="none" stroke="#5b6b73" stroke-width="1.6" marker-end="url(#a)">
+ <path d="M215,170 C250,170 255,215 285,215"/>
+ <path d="M215,273 C250,273 255,245 285,245"/>
+ <path d="M410,226 H440"/>
+ <path d="M580,226 H605"/>
+ <path d="M680,272 V300"/>
+ <path d="M755,226 H775"/>
+ <path d="M755,350 H775"/>
+ <path d="M895,290 H930"/>
+ <path d="M1165,200 C1190,200 1195,172 1220,172"/>
+ <path d="M1165,250 C1190,250 1195,260 1220,260"/>
+ <path d="M1385,214 V232"/>
+ <path d="M1385,288 V306"/>
+ <path d="M1385,382 V440" stroke-dasharray="5 4"/>
+ <path d="M1385,540 V590"/>
+ <path d="M835,425 V400"/>
+</g>
+<g fill="none" stroke="#c98f00" stroke-width="1.8" marker-end="url(#o)">
+ <path d="M215,600 H285"/>
+ <path d="M470,565 V487"/>
+ <path d="M710,565 V487"/>
+ <path d="M960,487 V525 H800 V565"/>
+ <path d="M1110,487 V565"/>
+ <path d="M1192,610 H1165"/>
+ <path d="M1220,500 H1192 V715 H460 V655" marker-start="url(#o)"/>
+ <path d="M760,715 V655"/>
+</g>
+</svg>
+<div class="lab" style="left:478px;top:497px">snapshot</div>
+<div class="lab" style="left:718px;top:497px">snapshot</div>
+<div class="lab" style="left:830px;top:508px">publish actions · propose rate actions</div>
+<div class="lab" style="left:1118px;top:512px">sync</div>
+<div class="lab" style="left:1392px;top:400px">team lead opens from the brief</div>
+<div class="lab" style="left:780px;top:705px">app reads / writes in Postgres transactions (OAuth, app service principal)</div>
+</div></body></html>

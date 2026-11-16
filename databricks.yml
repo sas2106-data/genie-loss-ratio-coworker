@@ -1,61 +1,37 @@
 bundle:
   name: genie-loss-ratio-coworker
 
+# Every Databricks resource is declared as code in resources/*.yml:
+#   resources/lrc_lakebase.yml  Lakebase Postgres instance (operational store)
+#   resources/lrc_pipeline.yml  Lakeflow Spark Declarative Pipeline (Auto Loader → bronze → silver → Gen AI DQ → gold)
+#   resources/lrc_jobs.yml      Lakeflow Jobs: setup, daily watch, and the end-to-end daily run
+#   resources/lrc_app.yml       Action Desk Databricks App on Lakebase
+include:
+  - resources/*.yml
+
 variables:
   catalog:
     description: Unity Catalog catalog to install into
   schema:
     default: loss_ratio_coworker
   warehouse_id:
-    description: Serverless SQL warehouse for the Genie Agent, dashboard and app
+    description: Serverless SQL warehouse for the Genie Agent and dashboard
   genie_space_id:
     description: Space id printed by deploy/genie_agent.py
     default: ""
   secret_scope:
     default: loss_ratio_coworker
-
-resources:
-  jobs:
-    lrc_setup:
-      name: "[LRC] 1 · Setup: synthetic loss run + semantic layer"
-      tasks:
-        - task_key: generate_loss_run
-          notebook_task:
-            notebook_path: ./src/setup/01_generate_loss_run.py
-            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
-        - task_key: semantic_layer
-          depends_on: [{task_key: generate_loss_run}]
-          notebook_task:
-            notebook_path: ./src/setup/02_semantic_layer.py
-            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
-
-    lrc_daily_watch:
-      name: "[LRC] 2 · Daily loss-ratio watch → Slack & Teams"
-      schedule:
-        quartz_cron_expression: "0 0 7 ? * MON-FRI"
-        timezone_id: Europe/London
-        pause_status: PAUSED
-      tasks:
-        - task_key: refresh_loss_run
-          notebook_task:
-            notebook_path: ./src/setup/01_generate_loss_run.py
-            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
-        - task_key: refresh_semantic_layer
-          depends_on: [{task_key: refresh_loss_run}]
-          notebook_task:
-            notebook_path: ./src/setup/02_semantic_layer.py
-            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
-        - task_key: watch_and_notify
-          depends_on: [{task_key: refresh_semantic_layer}]
-          notebook_task:
-            notebook_path: ./src/jobs/daily_loss_ratio_watch.py
-            base_parameters:
-              catalog: "${var.catalog}"
-              schema: "${var.schema}"
-              genie_space_id: "${var.genie_space_id}"
-              secret_scope: "${var.secret_scope}"
-              dry_run: "true"
-
+  lakebase_instance:
+    description: Lakebase Postgres instance for actions, team status and pricing transactions
+    default: lrc-lakebase
+  lakebase_database:
+    default: lrc_ops
+  llm_endpoint:
+    description: Foundation Model API chat endpoint used by ai_query in the pipeline's data-quality explanations
+    default: databricks-meta-llama-3-3-70b-instruct
+  ai_lookback_days:
+    description: Report days covered by the Gen AI data-quality checks (bounds token cost)
+    default: "14"
 
 targets:
   dev:

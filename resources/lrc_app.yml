@@ -1,0 +1,13 @@
+resources:
+  apps:
+    lrc_action_desk:
+      name: lrc-action-desk
+      description: "Loss Ratio Action Desk: team actions, watchlist and rate actions on Lakebase"
+      source_code_path: ../app/action_desk
+      resources:
+        - name: lakebase
+          description: Lakebase operational store
+          database:
+            instance_name: ${resources.database_instances.lrc_lakebase.name}
+            database_name: ${var.lakebase_database}
+            permission: CAN_CONNECT_AND_CREATE
