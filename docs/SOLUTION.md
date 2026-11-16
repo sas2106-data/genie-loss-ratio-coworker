@@ -65,6 +65,7 @@ All steps are notebooks or scripts in this repo, and all run in the Lakeflow Job
 | 11 | AI/BI dashboard | [`deploy/dashboard.py`](../deploy/dashboard.py) | script | Lakeview dashboard |
 | 12 | **Action Desk app on Lakebase** | [`app/action_desk/app.py`](../app/action_desk/app.py) ([`resources/lrc_app.yml`](../resources/lrc_app.yml)) | Databricks App | updates `ops.lr_actions`, `pricing.rate_actions` |
 | 13 | Genie One skill: brief → Slack → Gmail drafts | [`skills/loss-ratio-daily-brief.md`](../skills/loss-ratio-daily-brief.md) | Genie One skill | Slack post, Gmail drafts |
+| 14a | **Genie Agent benchmark**: ask the deployed agent, capture its SQL and result, score against ground truth | [`deploy/genie_benchmark.py`](../deploy/genie_benchmark.py) | script | [`run_evidence/06_genie_agent.md`](run_evidence/06_genie_agent.md) |
 | 14 | Collect run evidence into the repo | [`deploy/collect_run_evidence.py`](../deploy/collect_run_evidence.py) | script | [`docs/run_evidence/`](run_evidence/) |
 
 Infrastructure as code: [`databricks.yml`](../databricks.yml) + [`resources/`](../resources/) (Lakebase instance, pipeline,
@@ -93,6 +94,29 @@ so each claim is classified once per refresh window. Accuracy is measured every 
 
 Security: no passwords. Notebooks and the app use short-lived OAuth database credentials; the app connects as its own
 service principal, granted `SELECT` on what it reads and `UPDATE` only on the two tables it changes.
+
+## Genie Agent: measured, not assumed
+
+[`deploy/genie_benchmark.py`](../deploy/genie_benchmark.py) asks the deployed Genie Agent CUO-style questions through
+the Genie Conversation API and scores each answer against a ground-truth query on the same governed tables. The first
+run scored **9/10**: asked how many claims had personal data, Genie guessed a filter (`check_name ILIKE '%personal%'`)
+and returned 6 instead of 87. The fix was business context, not a model change: one instruction listing the exact
+`check_name` values. Re-run: **10/10**. Questions, Genie's SQL and results are in
+[`run_evidence/06_genie_agent.md`](run_evidence/06_genie_agent.md); extending it to the 20-question CUO set is the
+week-3 go-live gate (≥ 90%).
+
+## What the executives are measured on
+
+| Executive | KPI on their scorecard | How the coworker moves it |
+|---|---|---|
+| Chief Underwriting Officer | Underwriting result, accident-year loss ratio vs plan | Segment drift seen in days; rate inadequacy flagged with indicated vs achieved rate |
+| CFO | Combined ratio, earnings volatility, reserve adequacy | One governed number in Power BI and Genie; event IBNR booked the same week |
+| Chief Claims Officer | Claims leakage, cycle time, data quality | Wrong cause codes and personal data caught on arrival, each with a fix |
+| Head of Reinsurance | Recoveries collected, notification within treaty deadlines | P1 action with a 48-hour due date, tracked to DONE in Lakebase |
+| Chief Pricing Actuary | Rate adequacy, rate change achieved vs plan | Rate action proposed the same morning; RED-segment quotes referred |
+
+The strategic shift: from a monthly reporting cycle to a daily operating rhythm, where the data platform does not just
+report the loss ratio but routes each signal to an owner and records what was done.
 
 ## Outcomes (from the committed run)
 

@@ -49,6 +49,9 @@ How to answer:
 - When asked how we compare with the market, use industry_benchmarks and always name the source and basis (e.g. AM Best FY2025 US P&C 92.9%). Do not present benchmarks as targets.
 - Format ratios as percentages with one decimal and money as EUR with k/m suffixes. Keep answers short enough to read on a phone.
 - Data quality: use dq_daily_scorecard for pass rates and dq_claims_issues for the issues and their ai_explanation. Never show unmasked personal data.
+  Filter on check_name, which has exactly these values: 'pii_in_free_text' (personal data such as names, phone numbers or emails in the claim description),
+  'peril_mismatch' (coded cause of loss contradicts the description), 'negative_amount', 'loss_after_report', 'non_eur_currency'.
+  Count claims with COUNT(DISTINCT claim_id).
 - Team status: use lr_action_status for whether an action is OPEN, ACKNOWLEDGED, IN_PROGRESS or DONE, its owner and note (updated by teams in the Action Desk app on Lakebase).
 - Pricing: use gold_rate_adequacy for rate adequacy, bind ratio and proposed rate actions per segment.
 """

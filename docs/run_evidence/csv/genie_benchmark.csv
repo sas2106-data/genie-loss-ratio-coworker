@@ -1,0 +1,11 @@
+n,question,result,expected,genie_status
+1,Which line of business and region segments are RED today?,PASS,Property; DACH; Liability; Southern Europe; Motor; UK & Ireland,COMPLETED
+2,What is the 30-day loss ratio for Property in DACH?,PASS,0.9810150961485058,COMPLETED
+3,What is the year-to-date loss ratio for Liability in Southern Europe?,PASS,0.6953967964638149,COMPLETED
+4,What is the primary driver of the Motor loss ratio in UK & Ireland?,PASS,Frequency,COMPLETED
+5,What is the target loss ratio for Marine?,PASS,0.57,COMPLETED
+6,Which team owns the Property line of business?,PASS,Property Underwriting,COMPLETED
+7,Which data-quality check found the most issues on the latest report date?,PASS,pii_in_free_text,COMPLETED
+8,How many claims with personal data in the description were found in total?,PASS,87,COMPLETED
+9,How many Reinsurance actions are not done yet?,PASS,2,COMPLETED
+10,"Which segments are rate inadequate, with the achieved rate change below the indicated rate change and no rate action?",PASS,Liability; Southern Europe; Marine; DACH; Property; DACH; Marine; UK & Ireland; Motor; Southern Europe,COMPLETED

@@ -31,6 +31,7 @@ changes the coworker proposes. All data is synthetic.
 | Action Desk app | Teams update status, owner, note; Pricing approves rate actions (Postgres transactions) | [`app/action_desk/app.py`](app/action_desk/app.py), [`resources/lrc_app.yml`](resources/lrc_app.yml) |
 | Orchestration | One Lakeflow Job runs every step; one bundle deploys everything | [`resources/lrc_jobs.yml`](resources/lrc_jobs.yml) (`lrc_end_to_end`), [`databricks.yml`](databricks.yml) |
 | Genie Agent, dashboard, Genie One | Explain, answer, brief, Slack post, Gmail drafts | [`deploy/genie_agent.py`](deploy/genie_agent.py), [`deploy/dashboard.py`](deploy/dashboard.py), [`skills/loss-ratio-daily-brief.md`](skills/loss-ratio-daily-brief.md) |
+| Genie Agent benchmark | Asks the deployed agent CUO questions, scores against ground-truth SQL (10/10) | [`deploy/genie_benchmark.py`](deploy/genie_benchmark.py) → [`docs/run_evidence/06_genie_agent.md`](docs/run_evidence/06_genie_agent.md) |
 | Run evidence | Job run, notebook outputs, pipeline expectations, query results, Lakebase state, committed as Markdown + CSV | [`deploy/collect_run_evidence.py`](deploy/collect_run_evidence.py) → [`docs/run_evidence/`](docs/run_evidence/) |
 
 The original Genie One flow is still in [`docs/diagrams/flow.png`](docs/diagrams/flow.png).
