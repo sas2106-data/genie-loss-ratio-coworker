@@ -124,6 +124,19 @@ CREATE TABLE IF NOT EXISTS pricing.rate_actions (
   ...
     st = w.database.create_synced_database_table(SyncedDatabaseTable(
 
+# src/ml/06_train_frequency_forecast.py  (trained model, registered in Unity Catalog)
+    model = HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05, max_leaf_nodes=15, random_state=7)
+    model.fit(X_tr, y_tr)
+  ...
+    mae_model = mean_absolute_error(y_te, pred)
+    mae_naive = mean_absolute_error(y_te, X_te["c7"])
+  ...
+    info = mlflow.sklearn.log_model(model, "model", signature=infer_signature(X_tr, model.predict(X_tr.head(5))),
+  ...
+    client.set_registered_model_alias(MODEL, "champion", version)
+  ...
+champion = mlflow.sklearn.load_model(f"models:/{MODEL}@champion")
+
 # databricks.yml  (Lakeflow Job + pipeline + Lakebase instance + app, as code)
   database_instances:
   ...

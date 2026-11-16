@@ -602,6 +602,9 @@ def write_inline_proof(run, heads):
         "# src/lakebase/01_setup_lakebase.py + 02_publish_and_transact.py  (Lakebase Postgres)\n" +
         _grep("src/lakebase/01_setup_lakebase.py", [r"CREATE TABLE IF NOT EXISTS"]) + "\n" +
         _grep("src/lakebase/02_publish_and_transact.py", [r"INSERT INTO pricing", r"create_synced_database_table"]),
+        "# src/ml/06_train_frequency_forecast.py  (trained model, registered in Unity Catalog)\n" +
+        _grep("src/ml/06_train_frequency_forecast.py", [r"HistGradientBoostingRegressor\(", r"model\.fit", r"mean_absolute_error\(", r"log_model\(",
+                                                        r"set_registered_model_alias", r"load_model\("]),
         "# databricks.yml  (Lakeflow Job + pipeline + Lakebase instance + app, as code)\n" +
         _grep("databricks.yml", [r"^  (database_instances|pipelines|apps|jobs):", r"task_key: ", r"pipeline_task:"]),
     ])
