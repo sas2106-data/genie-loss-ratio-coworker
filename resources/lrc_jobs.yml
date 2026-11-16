@@ -48,14 +48,19 @@ resources:
         - task_key: lakebase_snapshot_to_delta
           depends_on: [{task_key: lakebase_publish_and_transact}]
           notebook_task: {notebook_path: ../src/lakebase/03_snapshot_to_delta.py, base_parameters: *lakebase}
+        - task_key: governance_policies
+          notebook_task: {notebook_path: ../src/governance/05_row_filter_column_mask.py, base_parameters: *base}
         - task_key: lakeflow_ingest_and_ai_dq
-          depends_on: [{task_key: land_raw_files}, {task_key: lakebase_snapshot_to_delta}]
+          depends_on: [{task_key: land_raw_files}, {task_key: lakebase_snapshot_to_delta}, {task_key: governance_policies}]
           pipeline_task:
             pipeline_id: ${resources.pipelines.lrc_ingest.id}
             full_refresh: false
         - task_key: evaluate_genai_dq
           depends_on: [{task_key: lakeflow_ingest_and_ai_dq}]
           notebook_task: {notebook_path: ../src/genai/04_evaluate_genai_dq.py, base_parameters: *base}
+        - task_key: train_frequency_forecast
+          depends_on: [{task_key: semantic_layer}, {task_key: lakebase_snapshot_to_delta}]
+          notebook_task: {notebook_path: ../src/ml/06_train_frequency_forecast.py, base_parameters: *base}
 
     lrc_setup:
       name: "[LRC] 1 · Setup: synthetic loss run + semantic layer"

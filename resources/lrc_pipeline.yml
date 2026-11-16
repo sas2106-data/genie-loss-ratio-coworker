@@ -13,3 +13,4 @@ resources:
         raw_path: /Volumes/${var.catalog}/${var.schema}/raw
         llm_endpoint: ${var.llm_endpoint}
         ai_lookback_days: ${var.ai_lookback_days}
+        policy_schema: ${var.catalog}.${var.schema}

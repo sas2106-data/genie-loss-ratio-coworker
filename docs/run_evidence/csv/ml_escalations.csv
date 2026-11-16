@@ -1,0 +1,2 @@
+line_of_business,region,forecast_vs_4wk_avg_pct,team,priority,lakebase_status,action
+Liability,UK & Ireland,22.5,Underwriting,P2,OPEN,Monitor. No action unless the 30-day loss ratio also breaches.

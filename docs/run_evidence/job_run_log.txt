@@ -1,0 +1,13 @@
+Lakeflow Job run 485868090598415  result=SUCCESS  start=2026-11-16 05:05:29 UTC  end=2026-11-16 05:21:06 UTC
+
+2026-11-16 05:05:29 UTC  governance_policies              notebook  SUCCESS      40s  depends_on=-
+2026-11-16 05:05:29 UTC  generate_loss_run                notebook  SUCCESS      43s  depends_on=-
+2026-11-16 05:05:29 UTC  lakebase_setup                   notebook  SUCCESS      32s  depends_on=-
+2026-11-16 05:06:13 UTC  land_raw_files                   notebook  SUCCESS      73s  depends_on=generate_loss_run
+2026-11-16 05:06:13 UTC  semantic_layer                   notebook  SUCCESS      36s  depends_on=generate_loss_run
+2026-11-16 05:06:50 UTC  watch_and_explain                notebook  SUCCESS     400s  depends_on=semantic_layer
+2026-11-16 05:13:30 UTC  lakebase_publish_and_transact    notebook  SUCCESS      28s  depends_on=watch_and_explain,lakebase_setup
+2026-11-16 05:13:59 UTC  lakebase_snapshot_to_delta       notebook  SUCCESS      24s  depends_on=lakebase_publish_and_transact
+2026-11-16 05:14:23 UTC  lakeflow_ingest_and_ai_dq        pipeline  SUCCESS     344s  depends_on=land_raw_files,lakebase_snapshot_to_delta,governance_policies
+2026-11-16 05:14:23 UTC  train_frequency_forecast         notebook  SUCCESS      76s  depends_on=semantic_layer,lakebase_snapshot_to_delta
+2026-11-16 05:20:07 UTC  evaluate_genai_dq                notebook  SUCCESS      58s  depends_on=lakeflow_ingest_and_ai_dq

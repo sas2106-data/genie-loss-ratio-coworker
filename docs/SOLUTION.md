@@ -9,6 +9,12 @@ a few points of loss ratio decide the year, and they move between month-ends: a 
 creep in the UK, a single EUR 2.4m bodily-injury claim. By the time the month-end pack lands, the event is three weeks
 old, reinsurers have not been notified, Pricing is still quoting the old rate, and nobody can say which team owns the fix.
 
+It bites hardest in a **specialty commercial** book (property catastrophe, marine cargo and hull, casualty with large
+single losses), written through brokers and protected by cat and per-risk excess-of-loss treaties: one event or one
+claim moves a line's loss ratio by tens of points, and treaty notification and recovery deadlines run in days, not months.
+The synthetic book here mirrors that mix: Property (a DACH hailstorm), Marine, Liability (a EUR 2.4m bodily-injury loss)
+and Motor (a frequency creep).
+
 Three things make it worse:
 
 1. **The data is not trustworthy on day one.** Claims arrive as FNOL files from several systems. Cause-of-loss codes
@@ -60,11 +66,13 @@ All steps are notebooks or scripts in this repo, and all run in the Lakeflow Job
 | 6 | **Lakebase transactions**: publish actions, record quotes and referrals, propose rate actions, create/refresh the synced table, grant the app | [`src/lakebase/02_publish_and_transact.py`](../src/lakebase/02_publish_and_transact.py) | notebook | Lakebase rows; `lr_watchlist_snapshot` → `lr_watchlist_serving` |
 | 7 | **Lakebase → Delta** snapshot of team status and pricing | [`src/lakebase/03_snapshot_to_delta.py`](../src/lakebase/03_snapshot_to_delta.py) | notebook | `lr_action_status`, `bronze_pricing_quotes`, `bronze_rate_actions` |
 | 8 | **Lakeflow ETL + Gen AI data quality**: bronze (Auto Loader) → silver (expectations, de-dup) → `ai_classify` / `ai_mask` / `ai_query` → gold | [`src/pipeline/lrc_ingest_pipeline.sql`](../src/pipeline/lrc_ingest_pipeline.sql) ([`resources/lrc_pipeline.yml`](../resources/lrc_pipeline.yml)) | Lakeflow SDP (SQL) | `bronze_fnol`, `bronze_premium`, `silver_claims`, `silver_premium`, `silver_claims_ai_checked`, `dq_claims_issues`, `dq_daily_scorecard`, `gold_daily_loss_run_lf`, `gold_rate_adequacy` |
-| 9 | **Gen AI evaluation**: precision/recall of the AI checks against seeded defects | [`src/genai/04_evaluate_genai_dq.py`](../src/genai/04_evaluate_genai_dq.py) | notebook | `dq_genai_eval` |
+| 9 | **Gen AI evaluation**: precision/recall against seeded defects + LLM judge (independent model family) of the explanations | [`src/genai/04_evaluate_genai_dq.py`](../src/genai/04_evaluate_genai_dq.py) | notebook | `dq_genai_eval`, `dq_explanation_judge` |
 | 10 | Genie Agent with DQ, team-status and pricing tables | [`deploy/genie_agent.py`](../deploy/genie_agent.py) | script | Genie space |
 | 11 | AI/BI dashboard | [`deploy/dashboard.py`](../deploy/dashboard.py) | script | Lakeview dashboard |
 | 12 | **Action Desk app on Lakebase** | [`app/action_desk/app.py`](../app/action_desk/app.py) ([`resources/lrc_app.yml`](../resources/lrc_app.yml)) | Databricks App | updates `ops.lr_actions`, `pricing.rate_actions` |
 | 13 | Genie One skill: brief → Slack → Gmail drafts | [`skills/loss-ratio-daily-brief.md`](../skills/loss-ratio-daily-brief.md) | Genie One skill | Slack post, Gmail drafts |
+| 9a | **Unity Catalog governance**: row filter by region and column mask on claim free text, attached by the pipeline | [`src/governance/05_row_filter_column_mask.py`](../src/governance/05_row_filter_column_mask.py) | notebook | `lrc_region_filter`, `lrc_mask_free_text`, `lrc_region_access` |
+| 9b | **ML**: next-7-day claim-frequency forecast, beats a naive baseline, registered in UC (`@champion`), joined with Lakebase team status | [`src/ml/06_train_frequency_forecast.py`](../src/ml/06_train_frequency_forecast.py) | notebook | UC model `lrc_frequency_forecast`, `lr_frequency_forecast`, `lr_forecast_escalations` |
 | 14a | **Genie Agent benchmark**: ask the deployed agent, capture its SQL and result, score against ground truth | [`deploy/genie_benchmark.py`](../deploy/genie_benchmark.py) | script | [`run_evidence/06_genie_agent.md`](run_evidence/06_genie_agent.md) |
 | 14 | Collect run evidence into the repo | [`deploy/collect_run_evidence.py`](../deploy/collect_run_evidence.py) | script | [`docs/run_evidence/`](run_evidence/) |
 
@@ -79,6 +87,16 @@ app, jobs).
 | Personal data in free text | `ai_mask(loss_description, ['person','phone number','email'])`; masked text is the only version used downstream | High | GDPR: free text is copied into briefs, emails and Genie answers |
 | Explanation and fix | `ai_query(<FM endpoint>, prompt with check, codes, amount and masked text)` | — | The claims handler gets a two-sentence fix, not a rule ID |
 | Negative amounts, loss after report, non-EUR | Lakeflow expectations + rules | Medium | Arithmetic errors that would distort the loss ratio |
+
+Tuning from measurement: the first runs showed `ai_mask` with an `address` label masking city names (≈92% false alarms;
+label dropped) and peril false alarms on genuinely multi-peril narratives (storm at sea damaging deck cargo, an
+overheating heater damaging a shop); the peril → cause mapping now accepts those combinations, while every seeded
+mismatch still contradicts its allowed causes. Each run appends to `dq_genai_eval`, so the history is visible in
+[`run_evidence/07_genai_quality.md`](run_evidence/07_genai_quality.md).
+
+Governance: raw free text lives only in `silver_claims`, protected by a Unity Catalog **column mask** (raw text only
+for `lrc_pii_readers`) and a **row filter** (a claims team sees only its region's book). `silver_claims_ai_checked`
+and `dq_claims_issues` keep only the `ai_mask`ed text.
 
 Cost control: AI checks run only on the last `ai_lookback_days` report days (default 14) and on materialized views,
 so each claim is classified once per refresh window. Accuracy is measured every run in `dq_genai_eval`.
@@ -110,7 +128,7 @@ week-3 go-live gate (≥ 90%).
 | Executive | KPI on their scorecard | How the coworker moves it |
 |---|---|---|
 | Chief Underwriting Officer | Underwriting result, accident-year loss ratio vs plan | Segment drift seen in days; rate inadequacy flagged with indicated vs achieved rate |
-| CFO | Combined ratio, earnings volatility, reserve adequacy | One governed number in Power BI and Genie; event IBNR booked the same week |
+| CFO | Combined ratio, earnings volatility, reserve adequacy | **From** the DACH hailstorm surfacing at month-end close, 3–6 weeks after the first claims, as a 1.6-pt (EUR 10.1m) unexplained jump in the quarter's loss ratio, **to** seeing it within days of the first claims (RED on the first daily run after it started) with event IBNR booked the same week and the quarter's combined-ratio guidance adjusted before close. One governed number in Power BI and Genie |
 | Chief Claims Officer | Claims leakage, cycle time, data quality | Wrong cause codes and personal data caught on arrival, each with a fix |
 | Head of Reinsurance | Recoveries collected, notification within treaty deadlines | P1 action with a 48-hour due date, tracked to DONE in Lakebase |
 | Chief Pricing Actuary | Rate adequacy, rate change achieved vs plan | Rate action proposed the same morning; RED-segment quotes referred |

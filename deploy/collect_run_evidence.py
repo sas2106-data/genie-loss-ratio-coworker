@@ -76,6 +76,9 @@ def notebook_cells(task_run_id):
             for item in r.get("data") or []:
                 if item.get("type") in ("ansi", "text") and item.get("data"):
                     outs.append(("text", re.sub(r"\x1b\[[0-9;]*m", "", item["data"]).strip()))
+                elif item.get("type") == "table":
+                    cols = [c["name"] for c in item.get("schema", [])]
+                    outs.append(("table", (cols, item.get("data") or [])))
         elif r.get("type") == "table":
             cols = [s["name"] for s in r.get("schema", [])]
             outs.append(("table", (cols, r.get("data") or [])))
@@ -92,10 +95,11 @@ def latest_run():
     jobs = cli("jobs", "list", "--name", "")  # list all, filter locally
     jobs = jobs if isinstance(jobs, list) else jobs.get("jobs", [])
     job = next(j for j in jobs if JOB_MATCH in j["settings"]["name"])
-    runs = cli("jobs", "list-runs", "--job-id", str(job["job_id"]), "--limit", "5")
+    runs = cli("jobs", "list-runs", "--job-id", str(job["job_id"]), "--limit", "10", "--expand-tasks")
     runs = runs if isinstance(runs, list) else runs.get("runs", [])
-    done = [r for r in runs if r["state"].get("life_cycle_state") == "TERMINATED"] or runs
-    return job, cli("jobs", "get-run", str(done[0]["run_id"]))
+    full = [r for r in runs if r["state"].get("life_cycle_state") == "TERMINATED"
+            and any("pipeline_task" in t for t in r.get("tasks", [])) and len(r.get("tasks", [])) >= 8]
+    return job, cli("jobs", "get-run", str((full or runs)[0]["run_id"]))   # latest complete run, not a partial --only run
 
 
 def write_job(job, run):
@@ -152,6 +156,62 @@ def write_notebooks(run):
                     cols, data = val
                     parts.append(md_table(cols, data, 20))
     (OUT / "02_notebook_outputs.md").write_text("\n".join(parts) + "\n")
+
+
+# ---------- executed notebooks (.ipynb with outputs) + run logs ----------
+def write_ipynb(run):
+    nb_dir = OUT / "notebooks"
+    nb_dir.mkdir(parents=True, exist_ok=True)
+    for old in nb_dir.glob("*.ipynb"):
+        old.unlink()
+    order = sorted((t for t in run["tasks"] if "notebook_task" in t), key=lambda t: t.get("start_time") or 0)
+    for n, t in enumerate(order, 1):
+        try:
+            cells = notebook_cells(t["run_id"])
+        except Exception:  # noqa: BLE001
+            continue
+        nb_cells = []
+        for code, outs in cells:
+            src = code.strip("\n")
+            if src.startswith("%md"):
+                nb_cells.append({"cell_type": "markdown", "metadata": {}, "source": re.sub(r"^%md ?", "", src)})
+                continue
+            outputs = []
+            for kind, val in outs:
+                if kind == "text":
+                    outputs.append({"output_type": "stream", "name": "stdout", "text": val + "\n"})
+                else:
+                    cols, data = val
+                    outputs.append({"output_type": "display_data", "metadata": {},
+                                    "data": {"text/markdown": md_table(cols, data, 30), "text/plain": f"{len(data)} rows"}})
+            nb_cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "source": src, "outputs": outputs})
+        nb = {"nbformat": 4, "nbformat_minor": 5, "cells": nb_cells,
+              "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3"},
+                           "language_info": {"name": "python"},
+                           "databricks_run": {"job_run_id": run["run_id"], "task_key": t["task_key"],
+                                              "result": t["state"].get("result_state"), "started": ts(t.get("start_time"))}}}
+        name = f"{n:02d}_{t['task_key']}.ipynb"
+        (nb_dir / name).write_text(json.dumps(nb, indent=1))
+
+
+def write_logs(run):
+    lines = [f"Lakeflow Job run {run['run_id']}  result={run['state'].get('result_state')}  "
+             f"start={ts(run.get('start_time'))}  end={ts(run.get('end_time'))}", ""]
+    for t in sorted(run["tasks"], key=lambda t: t.get("start_time") or 0):
+        dur = ((t.get("end_time") or 0) - (t.get("start_time") or 0)) / 1000
+        kind = "pipeline" if "pipeline_task" in t else "notebook"
+        lines.append(f"{ts(t.get('start_time'))}  {t['task_key']:<32} {kind:<9} {t['state'].get('result_state', ''):<8} "
+                     f"{dur:6.0f}s  depends_on={','.join(d['task_key'] for d in t.get('depends_on', [])) or '-'}")
+    (OUT / "job_run_log.txt").write_text("\n".join(lines) + "\n")
+    t = next((t for t in run["tasks"] if "pipeline_task" in t), None)
+    if t:
+        pid = t["pipeline_task"]["pipeline_id"]
+        uid = cli("pipelines", "get", pid).get("latest_updates", [{}])[0].get("update_id")
+        _, ev = sql(f"""SELECT timestamp, event_type, level, message FROM event_log('{pid}')
+                        WHERE origin.update_id = '{uid}' ORDER BY timestamp""")
+        (OUT / "pipeline_event_log.txt").write_text(
+            f"Lakeflow pipeline update {uid}: {len(ev)} events from event_log()\n\n" +
+            "\n".join(f"{r[0]}  {r[1]:<20} {r[2]:<6} {r[3]}" for r in ev) + "\n")
 
 
 # ---------- 03 pipeline ----------
@@ -309,8 +369,97 @@ Source: [`app/action_desk/app.py`](../../app/action_desk/app.py). Screenshot: [`
     (OUT / "05_lakebase.md").write_text(body)
 
 
+# ---------- 07 Gen AI quality, 08 governance, 09 ML ----------
+def section(title, q, limit=MAX_ROWS, key=None):
+    try:
+        cols, rows = sql(q)
+    except Exception as e:  # noqa: BLE001
+        return f"\n## {title}\n\n_query failed: {str(e)[:200]}_\n", ([], [])
+    if key:
+        (OUT / "csv").mkdir(exist_ok=True)
+        with open(OUT / "csv" / f"{key}.csv", "w", newline="") as f:
+            wr = csv.writer(f); wr.writerow(cols); wr.writerows(rows)
+    return f"\n## {title}\n\n" + md_table(cols, rows, limit) + "\n", (cols, rows)
+
+
+def write_extras():
+    g = ["# 07 · Gen AI data-quality checks: precision, recall and LLM judge\n",
+         "Produced every run by [`src/genai/04_evaluate_genai_dq.py`](../../src/genai/04_evaluate_genai_dq.py) against the defects "
+         "seeded by [`src/raw/03_land_raw_files.py`](../../src/raw/03_land_raw_files.py). The checks themselves are in "
+         "[`src/pipeline/lrc_ingest_pipeline.sql`](../../src/pipeline/lrc_ingest_pipeline.sql) (`ai_classify`, `ai_mask`, `ai_query`).\n"]
+    txt, _ = section("Precision / recall per check (latest run)", f"""SELECT check_name, genai_function, claims_checked, seeded_defects, flagged,
+        true_positives, false_positives, false_negatives, precision, recall, f1 FROM {fq('dq_genai_eval')}
+        WHERE evaluated_at = (SELECT MAX(evaluated_at) FROM {fq('dq_genai_eval')})""", key="genai_precision_recall"); g.append(txt)
+    txt, _ = section("History across runs (tuning shows up here)", f"""SELECT date_format(evaluated_at, 'yyyy-MM-dd HH:mm') AS run, check_name, precision, recall, f1
+        FROM {fq('dq_genai_eval')} ORDER BY evaluated_at, check_name"""); g.append(txt)
+    txt, _ = section("LLM judge of the ai_query explanations (independent model family)", f"""SELECT judge_endpoint, check_name, COUNT(*) judged,
+        ROUND(AVG(CAST(correct_check AS INT)),3) correct_check, ROUND(AVG(CAST(actionable AS INT)),3) actionable,
+        ROUND(AVG(CAST(no_personal_data AS INT)),3) no_personal_data, ROUND(AVG(CAST(faithful AS INT)),3) faithful, ROUND(AVG(score),2) avg_score
+        FROM {fq('dq_explanation_judge')} WHERE judged_at = (SELECT MAX(judged_at) FROM {fq('dq_explanation_judge')})
+        GROUP BY ROLLUP (judge_endpoint, check_name) HAVING judge_endpoint IS NOT NULL OR check_name IS NULL
+        ORDER BY check_name NULLS LAST""", key="genai_llm_judge"); g.append(txt)
+    txt, _ = section("Lowest-scored explanations (what the judge objected to)", f"""SELECT check_name, score, reason, ai_explanation
+        FROM {fq('dq_explanation_judge')} WHERE judged_at = (SELECT MAX(judged_at) FROM {fq('dq_explanation_judge')})
+        ORDER BY score, check_name LIMIT 6"""); g.append(txt)
+    (OUT / "07_genai_quality.md").write_text("\n".join(g))
+
+    v = ["# 08 · Unity Catalog governance: row filter and column mask on claims\n",
+         "Functions from [`src/governance/05_row_filter_column_mask.py`](../../src/governance/05_row_filter_column_mask.py), "
+         "attached by the pipeline (`MASK` and `WITH ROW FILTER` in "
+         "[`src/pipeline/lrc_ingest_pipeline.sql`](../../src/pipeline/lrc_ingest_pipeline.sql)).\n"]
+    txt, _ = section("Row filters attached (information_schema)", f"""SELECT table_name, filter_name, target_columns
+        FROM {CATALOG}.information_schema.row_filters WHERE table_schema = '{SCHEMA}'"""); v.append(txt)
+    txt, _ = section("Column masks attached (information_schema)", f"""SELECT table_name, column_name, mask_name
+        FROM {CATALOG}.information_schema.column_masks WHERE table_schema = '{SCHEMA}'"""); v.append(txt)
+    txt, _ = section("Which group sees which book (row filter mapping)", f"""SELECT a.group_name, COUNT(*) AS claims_visible
+        FROM {fq('silver_claims')} c JOIN {fq('lrc_region_access')} a ON a.region = c.region GROUP BY a.group_name ORDER BY 1"""); v.append(txt)
+    txt, _ = section("What a non-PII reader sees (column mask redaction)", f"""SELECT claim_id, region,
+        {fq('lrc_redact')}(loss_description) AS seen_by_everyone_else
+        FROM {fq('silver_claims')} WHERE loss_description RLIKE '@example' LIMIT 6"""); v.append(txt)
+    (OUT / "08_governance.md").write_text("\n".join(v))
+
+    m = ["# 09 · ML: claim-frequency forecast registered in Unity Catalog\n",
+         "Trained by [`src/ml/06_train_frequency_forecast.py`](../../src/ml/06_train_frequency_forecast.py): gradient-boosted trees on "
+         "weekly features from `gold_daily_loss_run`, time-based hold-out, compared with a naive baseline, registered as "
+         f"`<catalog>.{SCHEMA}.lrc_frequency_forecast` with alias `champion`. Training metrics are printed in "
+         "[`notebooks/`](notebooks/) (task `train_frequency_forecast`).\n"]
+    try:
+        mv = cli("registered-models", "get", f"{CATALOG}.{SCHEMA}.lrc_frequency_forecast", "--include-aliases")
+        m.append("\n## Registered model\n\n" + md_table(["model", "aliases", "owner"],
+                 [[mv.get("full_name"), ", ".join(f"{a['alias_name']}→v{a['version_num']}" for a in mv.get("aliases", [])), "<user>"]]) + "\n")
+    except SystemExit as e:
+        m.append(f"\n_registered model lookup failed: {str(e)[:150]}_\n")
+    txt, _ = section("Forecast per segment (latest week)", f"""SELECT line_of_business, region, claims_last7, forecast_next7_claims,
+        ROUND(weekly_avg_last4,1) weekly_avg_last4, forecast_vs_4wk_avg_pct, frequency_outlook, model_version
+        FROM {fq('lr_frequency_forecast')} ORDER BY forecast_vs_4wk_avg_pct DESC""", key="ml_frequency_forecast"); m.append(txt)
+    txt, _ = section("Escalations: forecast RISING and the Lakebase action still OPEN", f"""SELECT line_of_business, region,
+        forecast_vs_4wk_avg_pct, team, priority, lakebase_status, action FROM {fq('lr_forecast_escalations')}""", key="ml_escalations"); m.append(txt)
+    (OUT / "09_ml_forecast.md").write_text("\n".join(m))
+    heads = {}
+    try:
+        _, j = sql(f"""SELECT COUNT(*), ROUND(AVG(score),2), ROUND(AVG(CAST(correct_check AS INT)),2), ROUND(AVG(CAST(no_personal_data AS INT)),2)
+                       FROM {fq('dq_explanation_judge')} WHERE judged_at = (SELECT MAX(judged_at) FROM {fq('dq_explanation_judge')})""")
+        heads["judge"] = f"{j[0][0]} explanations judged · avg score {j[0][1]}/5 · correct check {j[0][2]} · no personal data {j[0][3]}"
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        _, rf = sql(f"SELECT COUNT(*) FROM {CATALOG}.information_schema.row_filters WHERE table_schema = '{SCHEMA}'")
+        _, cm = sql(f"SELECT COUNT(*) FROM {CATALOG}.information_schema.column_masks WHERE table_schema = '{SCHEMA}'")
+        heads["gov"] = f"{rf[0][0]} row filter(s) and {cm[0][0]} column mask(s) attached in Unity Catalog"
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        _, fc = sql(f"SELECT COUNT(*), SUM(CASE WHEN frequency_outlook='RISING' THEN 1 ELSE 0 END), MAX(model_version) FROM {fq('lr_frequency_forecast')}")
+        _, es = sql(f"SELECT COUNT(*) FROM {fq('lr_forecast_escalations')}")
+        heads["ml"] = f"UC model v{fc[0][2]} scored {fc[0][0]} segments · {fc[0][1]} rising · {es[0][0]} escalations (rising + Lakebase action OPEN)"
+    except Exception:  # noqa: BLE001
+        pass
+    return heads
+
+
 # ---------- README ----------
-def write_index(job, run, task_rows, exp_rows, results):
+def write_index(job, run, task_rows, exp_rows, results, heads=None):
+    heads = heads or {}
     ok = sum(1 for r in task_rows if r[3] == "SUCCESS")
     failed_exp = sum(int(r[3] or 0) for r in exp_rows)
     sc = results.get("dq_scorecard_latest", ([], []))[1]
@@ -341,6 +490,9 @@ Readable, committed output of one real run of the `lrc_end_to_end` Lakeflow Job 
 | Reconciliation | Lakeflow gold incurred differs from original gold by **{rec[4]}%** over {rec[0]} → {rec[1]} |
 | Rate adequacy | {inadequate} segment(s) where the achieved rate change is below the indicated rate change |
 | Lakebase actions | {acts} actions in `ops.lr_actions` with team status |
+| LLM judge of explanations | {heads.get('judge', 'n/a')} |
+| Unity Catalog policies | {heads.get('gov', 'n/a')} |
+| ML forecast | {heads.get('ml', 'n/a')} |
 
 | File | What it shows |
 |---|---|
@@ -349,6 +501,12 @@ Readable, committed output of one real run of the `lrc_end_to_end` Lakeflow Job 
 | [03_lakeflow_pipeline.md](03_lakeflow_pipeline.md) | Pipeline datasets and expectation pass/fail counts from the event log |
 | [04_query_results.md](04_query_results.md) | DQ scorecard, Gen AI findings, reconciliation, rate adequacy, watchlist |
 | [05_lakebase.md](05_lakebase.md) | Lakebase instance, synced table, Action Desk app, team status |
+| [07_genai_quality.md](07_genai_quality.md) | Gen AI precision/recall per check, history across runs, LLM-judge scores of the explanations |
+| [08_governance.md](08_governance.md) | Unity Catalog row filter and column mask attached to the claims tables |
+| [09_ml_forecast.md](09_ml_forecast.md) | Frequency forecast model in Unity Catalog, forecasts, escalations with Lakebase status |
+| [notebooks/](notebooks/) | **Executed notebooks (.ipynb) with their real cell outputs**, one per job task |
+| [job_run_log.txt](job_run_log.txt) | Plain-text job run log: every task, result, duration, dependencies |
+| [pipeline_event_log.txt](pipeline_event_log.txt) | Plain-text Lakeflow pipeline event log for the run's update |
 | [csv/](csv/) | Query results as CSV |
 """
     (OUT / "README.md").write_text(body)
@@ -365,13 +523,26 @@ def redact() -> None:
         (re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\))"), "<service-principal>"),
         (re.compile(r"instance-[0-9a-f-]+\.database\.[a-z0-9.]+"), "<lakebase-host>"),
     ]
-    for f in OUT.rglob("*"):
-        if f.suffix not in (".md", ".csv"):
-            continue
-        t = f.read_text().replace(CATALOG, "<catalog>")
+    def clean(t: str) -> str:
+        t = t.replace(CATALOG, "<catalog>")
         for rx, rep in subs:
             t = rx.sub(rep, t)
-        f.write_text(t)
+        return t
+
+    def walk(o):   # redact every string inside a notebook without breaking its JSON
+        if isinstance(o, str):
+            return clean(o)
+        if isinstance(o, list):
+            return [walk(x) for x in o]
+        if isinstance(o, dict):
+            return {k: walk(v) for k, v in o.items()}
+        return o
+
+    for f in OUT.rglob("*"):
+        if f.suffix == ".ipynb":
+            f.write_text(json.dumps(walk(json.loads(f.read_text())), indent=1))
+        elif f.suffix in (".md", ".csv", ".txt"):
+            f.write_text(clean(f.read_text()))
 
 
 def main():
@@ -382,7 +553,10 @@ def main():
     exp_rows = write_pipeline(run)
     results = write_queries()
     write_lakebase(results)
-    write_index(job, run, task_rows, exp_rows, results)
+    write_ipynb(run)
+    write_logs(run)
+    heads = write_extras()
+    write_index(job, run, task_rows, exp_rows, results, heads)
     redact()
     print(f"wrote {OUT}")
 

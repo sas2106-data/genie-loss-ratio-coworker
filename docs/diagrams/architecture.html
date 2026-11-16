@@ -44,9 +44,9 @@
 <div class="b lf" style="left:605px;top:180px;width:150px;height:92px"><h>Silver</h>expectations: EUR, no negatives, dates; de-dup resends</div>
 <div class="b ai" style="left:440px;top:300px;width:315px;height:100px"><h><span class="n">3</span>Gen AI data quality</h><span class="k">ai_classify</span> peril vs coded cause · <span class="k">ai_mask</span> names, phones, emails · <span class="k">ai_query</span> explains each issue and the fix</div>
 <div class="b lf" style="left:775px;top:180px;width:120px;height:220px"><h>Gold</h>loss run (Lakeflow)<br><br>DQ scorecard + issues<br><br>rate adequacy:<br>indicated vs achieved rate</div>
-<div class="b uc" style="left:930px;top:180px;width:235px;height:307px"><h><span class="n">4</span>Semantic layer</h>metric views <span class="k">mv_loss_ratio</span>, <span class="k">mv_loss_run</span>: one loss-ratio definition for every surface<br><br>Genie Ontology: synonyms, comments, tags, targets, owners<br><br>RAG watchlist, alerts and the action playbook (daily watch job)<br><br>DQ scorecard, rate adequacy and team status exposed to Genie</div>
+<div class="b uc" style="left:930px;top:180px;width:235px;height:307px"><h><span class="n">4</span>Semantic layer</h>metric views <span class="k">mv_loss_ratio</span>, <span class="k">mv_loss_run</span>: one loss-ratio definition for every surface<br><br>Genie Ontology: synonyms, comments, tags, targets, owners<br><br>RAG watchlist, alerts and the action playbook (daily watch job)<br><br><b>ML</b>: claim-frequency forecast, UC model <span class="k">@champion</span>; rising + Lakebase action OPEN → escalation</div>
 <div class="b uc" style="left:440px;top:425px;width:455px;height:62px"><h>Delta snapshots of Lakebase (what teams did today)</h><span class="k">lr_action_status · bronze_pricing_quotes · bronze_rate_actions</span></div>
-<div class="b uc" style="left:285px;top:425px;width:130px;height:62px;font-size:11.5px"><h style="font-size:12px">Lineage · tags · grants</h>on every table</div>
+<div class="b uc" style="left:285px;top:425px;width:130px;height:62px;font-size:11.5px"><h style="font-size:12px">UC policies</h>row filter · column mask · lineage</div>
 
 <!-- Lakebase -->
 <div class="b lb" style="left:285px;top:565px;width:250px;height:90px"><h><span class="n">5</span>pricing schema</h><span class="k">quotes</span> (24k+ transactions)<br><span class="k">rate_actions</span> proposed by the coworker, decided by Pricing</div>
@@ -63,7 +63,7 @@
 <!-- job -->
 <div class="b job" style="left:30px;top:755px;width:1540px;height:100px;font-size:13px">
 <h style="font-size:14.5px">Lakeflow Job <span class="k" style="color:#9fe0c6">lrc_end_to_end</span> · 06:30 weekdays · defined in one Declarative Automation Bundle (pipeline, Lakebase instance, app, jobs)</h>
-generate loss run → semantic layer → land raw files → daily watch (detect RED/AMBER, ask Genie why, playbook) → Lakebase setup → publish actions + record quotes + propose rate actions + sync watchlist → snapshot Lakebase to Delta → Lakeflow pipeline (bronze → silver → Gen AI DQ → gold) · run evidence committed in <span class="k" style="color:#9fe0c6">docs/run_evidence/</span></div>
+generate → semantic layer → land raw files → daily watch (detect, ask Genie why, playbook) → Lakebase setup → publish actions, quotes, rate actions, synced table → snapshot to Delta → UC policies → Lakeflow pipeline (bronze → silver → Gen AI DQ → gold) → Gen AI precision/recall + LLM judge → ML forecast · 11 tasks · evidence in <span class="k" style="color:#9fe0c6">docs/run_evidence/</span></div>
 
 <svg width="1600" height="900"><defs>
 <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#5b6b73"/></marker>

@@ -5,7 +5,7 @@
 | Pipeline id | `6e420ed9-2d49-431b-b14e-b358b8d19ba9` |
 | Source | [`src/pipeline/lrc_ingest_pipeline.sql`](../../src/pipeline/lrc_ingest_pipeline.sql) |
 | Compute | serverless |
-| Latest update | `b3bd8eb7-7cc2-4ae1-b234-6b8c1dc9c736` · **COMPLETED** · 2026-11-16T03:52:17.071Z |
+| Latest update | `9f45d277-7d53-4702-a081-cb8ea299bcf9` · **COMPLETED** · 2026-11-16T05:14:25.002Z |
 
 ## Datasets written in this update
 
@@ -13,8 +13,8 @@
 |---|---|
 | bronze_fnol |  |
 | bronze_premium |  |
-| dq_claims_issues | 153 |
-| dq_daily_scorecard | 44 |
+| dq_claims_issues | 128 |
+| dq_daily_scorecard | 43 |
 | gold_daily_loss_run_lf | 590 |
 | gold_rate_adequacy | 20 |
 | silver_claims | 3716 |

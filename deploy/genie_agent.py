@@ -54,6 +54,9 @@ How to answer:
   Count claims with COUNT(DISTINCT claim_id).
 - Team status: use lr_action_status for whether an action is OPEN, ACKNOWLEDGED, IN_PROGRESS or DONE, its owner and note (updated by teams in the Action Desk app on Lakebase).
 - Pricing: use gold_rate_adequacy for rate adequacy, bind ratio and proposed rate actions per segment.
+- One number: the 7-day, 30-day and year-to-date loss ratio of a segment always come from v_loss_ratio_watchlist (lr_7d, lr_30d, lr_ytd)
+  or the mv_loss_ratio metric view. Never answer a loss-ratio question from gold_rate_adequacy.loss_ratio_30d or gold_daily_loss_run_lf;
+  those are pipeline reconciliation inputs, not the governed number.
 """
 
 SAMPLE_QUESTIONS = [
