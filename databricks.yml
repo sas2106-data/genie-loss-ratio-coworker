@@ -1,13 +1,16 @@
+# Declarative Automation Bundle: every Databricks resource of the Genie Loss Ratio Coworker, as code, in one file.
+#
+#   database_instances.lrc_lakebase   Lakebase Postgres instance: ops.lr_actions (team status), pricing.quotes, pricing.rate_actions
+#   pipelines.lrc_ingest              Lakeflow Spark Declarative Pipeline: Auto Loader → bronze → silver (expectations, UC row
+#                                     filter + column mask) → Gen AI data quality (ai_classify, ai_mask, ai_query) → gold
+#   apps.lrc_action_desk              Databricks App on Lakebase: teams update actions, Pricing decides rate actions
+#   jobs.lrc_end_to_end               Lakeflow Job, 11 tasks: sources → Lakeflow → Gen AI → Lakebase → ML → Genie
+#   jobs.lrc_setup / lrc_daily_watch  setup only / watch only
+#
+# Deploy:  databricks bundle deploy --var catalog=<catalog> --var warehouse_id=<id> --var genie_space_id=<id>
+# Run:     databricks bundle run lrc_end_to_end ...      (evidence of a real run: docs/run_evidence/)
 bundle:
   name: genie-loss-ratio-coworker
-
-# Every Databricks resource is declared as code in resources/*.yml:
-#   resources/lrc_lakebase.yml  Lakebase Postgres instance (operational store)
-#   resources/lrc_pipeline.yml  Lakeflow Spark Declarative Pipeline (Auto Loader → bronze → silver → Gen AI DQ → gold)
-#   resources/lrc_jobs.yml      Lakeflow Jobs: setup, daily watch, and the end-to-end daily run
-#   resources/lrc_app.yml       Action Desk Databricks App on Lakebase
-include:
-  - resources/*.yml
 
 variables:
   catalog:
@@ -29,9 +32,153 @@ variables:
   llm_endpoint:
     description: Foundation Model API chat endpoint used by ai_query in the pipeline's data-quality explanations
     default: databricks-meta-llama-3-3-70b-instruct
+  judge_endpoint:
+    description: Independent model family used as LLM judge of the explanations
+    default: databricks-claude-sonnet-5-5
   ai_lookback_days:
     description: Report days covered by the Gen AI data-quality checks (bounds token cost)
     default: "14"
+
+x-base: &base
+  catalog: "${var.catalog}"
+  schema: "${var.schema}"
+x-lakebase: &lakebase
+  catalog: "${var.catalog}"
+  schema: "${var.schema}"
+  lakebase_instance: "${var.lakebase_instance}"
+  lakebase_database: "${var.lakebase_database}"
+
+resources:
+
+  # ── Lakebase: the low-latency operational store ────────────────────────────────────────────────────────────────
+  database_instances:
+    lrc_lakebase:
+      name: ${var.lakebase_instance}
+      capacity: CU_1
+
+  # ── Lakeflow Spark Declarative Pipeline (src/pipeline/lrc_ingest_pipeline.sql) ───────────────────────────────────
+  pipelines:
+    lrc_ingest:
+      name: "[LRC] Lakeflow ingest: raw volume → bronze → silver → Gen AI DQ → gold"
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      photon: true
+      libraries:
+        - file:
+            path: ./src/pipeline/lrc_ingest_pipeline.sql
+      configuration:
+        raw_path: /Volumes/${var.catalog}/${var.schema}/raw
+        llm_endpoint: ${var.llm_endpoint}
+        ai_lookback_days: ${var.ai_lookback_days}
+        policy_schema: ${var.catalog}.${var.schema}
+
+  # ── Databricks App on Lakebase (app/action_desk/app.py) ─────────────────────────────────────────────────────────
+  apps:
+    lrc_action_desk:
+      name: lrc-action-desk
+      description: "Loss Ratio Action Desk: team actions, watchlist and rate actions on Lakebase"
+      source_code_path: ./app/action_desk
+      resources:
+        - name: lakebase
+          description: Lakebase operational store
+          database:
+            instance_name: ${resources.database_instances.lrc_lakebase.name}
+            database_name: ${var.lakebase_database}
+            permission: CAN_CONNECT_AND_CREATE
+
+  # ── Lakeflow Jobs ────────────────────────────────────────────────────────────────────────────────────────────────
+  jobs:
+    lrc_end_to_end:
+      name: "[LRC] 0 · End-to-end daily run: sources → Lakeflow → Gen AI DQ → Lakebase → Genie"
+      description: >
+        Synthetic source systems land files in a raw volume; the daily watch detects, asks Genie why, publishes actions to
+        Lakebase and has an LLM judge grade the explanations; pricing transactions go to Lakebase and are snapshotted back;
+        Unity Catalog policies are created; the Lakeflow pipeline ingests the files with Auto Loader, runs rule-based and
+        Gen AI data-quality checks and builds gold tables; the Gen AI checks are scored; a frequency model is trained.
+      schedule:
+        quartz_cron_expression: "0 30 6 ? * MON-FRI"
+        timezone_id: Europe/London
+        pause_status: PAUSED
+      tasks:
+        - task_key: governance_policies          # UC row filter + column mask functions
+          notebook_task: {notebook_path: ./src/governance/05_row_filter_column_mask.py, base_parameters: *base}
+        - task_key: generate_loss_run            # synthetic book with three seeded events
+          notebook_task: {notebook_path: ./src/setup/01_generate_loss_run.py, base_parameters: *base}
+        - task_key: lakebase_setup               # Postgres schemas ops + pricing, seeded quotes
+          notebook_task: {notebook_path: ./src/lakebase/01_setup_lakebase.py, base_parameters: *lakebase}
+        - task_key: semantic_layer               # gold, metric views, Ontology, row filter on gold
+          depends_on: [{task_key: generate_loss_run}, {task_key: governance_policies}]
+          notebook_task: {notebook_path: ./src/setup/02_semantic_layer.py, base_parameters: *base}
+        - task_key: land_raw_files               # FNOL JSON + bordereaux CSV into the raw UC volume
+          depends_on: [{task_key: generate_loss_run}]
+          notebook_task:
+            notebook_path: ./src/raw/03_land_raw_files.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}", days: "30", files_per_day: "2"}
+        - task_key: watch_and_explain            # detect → Genie why → playbook → Lakebase publish → LLM judge
+          depends_on: [{task_key: semantic_layer}, {task_key: lakebase_setup}]
+          notebook_task:
+            notebook_path: ./src/jobs/daily_loss_ratio_watch.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+              genie_space_id: "${var.genie_space_id}"
+              secret_scope: "${var.secret_scope}"
+              dry_run: "true"
+              lakebase_instance: "${var.lakebase_instance}"
+              lakebase_database: "${var.lakebase_database}"
+              judge_endpoint: "${var.judge_endpoint}"
+        - task_key: lakebase_publish_and_transact   # quotes, rate actions, synced table, app grants
+          depends_on: [{task_key: watch_and_explain}]
+          notebook_task:
+            notebook_path: ./src/lakebase/02_publish_and_transact.py
+            base_parameters: *lakebase
+        - task_key: lakebase_snapshot_to_delta   # Postgres → Delta for Genie and Lakeflow
+          depends_on: [{task_key: lakebase_publish_and_transact}]
+          notebook_task: {notebook_path: ./src/lakebase/03_snapshot_to_delta.py, base_parameters: *lakebase}
+        - task_key: lakeflow_ingest_and_ai_dq    # the Lakeflow Spark Declarative Pipeline
+          depends_on: [{task_key: land_raw_files}, {task_key: lakebase_snapshot_to_delta}, {task_key: governance_policies}]
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.lrc_ingest.id}
+            full_refresh: false
+        - task_key: evaluate_genai_dq            # precision/recall vs seeded defects + LLM judge
+          depends_on: [{task_key: lakeflow_ingest_and_ai_dq}]
+          notebook_task: {notebook_path: ./src/genai/04_evaluate_genai_dq.py, base_parameters: *base}
+        - task_key: train_frequency_forecast     # ML model in UC registry + Lakebase status escalations
+          depends_on: [{task_key: semantic_layer}, {task_key: lakebase_snapshot_to_delta}]
+          notebook_task: {notebook_path: ./src/ml/06_train_frequency_forecast.py, base_parameters: *base}
+
+    lrc_setup:
+      name: "[LRC] 1 · Setup: synthetic loss run + semantic layer"
+      tasks:
+        - task_key: generate_loss_run
+          notebook_task: {notebook_path: ./src/setup/01_generate_loss_run.py, base_parameters: *base}
+        - task_key: semantic_layer
+          depends_on: [{task_key: generate_loss_run}]
+          notebook_task: {notebook_path: ./src/setup/02_semantic_layer.py, base_parameters: *base}
+
+    lrc_daily_watch:
+      name: "[LRC] 2 · Daily loss-ratio watch → Slack & Teams"
+      schedule:
+        quartz_cron_expression: "0 0 7 ? * MON-FRI"
+        timezone_id: Europe/London
+        pause_status: PAUSED
+      tasks:
+        - task_key: refresh_loss_run
+          notebook_task: {notebook_path: ./src/setup/01_generate_loss_run.py, base_parameters: *base}
+        - task_key: refresh_semantic_layer
+          depends_on: [{task_key: refresh_loss_run}]
+          notebook_task: {notebook_path: ./src/setup/02_semantic_layer.py, base_parameters: *base}
+        - task_key: watch_and_notify
+          depends_on: [{task_key: refresh_semantic_layer}]
+          notebook_task:
+            notebook_path: ./src/jobs/daily_loss_ratio_watch.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+              genie_space_id: "${var.genie_space_id}"
+              secret_scope: "${var.secret_scope}"
+              dry_run: "true"
 
 targets:
   dev:

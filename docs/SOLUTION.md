@@ -2,6 +2,17 @@
 
 ![Architecture](diagrams/architecture.png)
 
+## The story first: a day with the Chief Underwriting Officer
+
+At **07:30** Elena, the CUO of a specialty commercial book, reads in Slack that Property DACH is RED: a **266%** 7-day loss
+ratio against a 60% target, driven by a hailstorm. By **08:10** Reinsurance has a P1 action to notify the cat XL
+reinsurers within 48 hours and Claims has marked the event response IN_PROGRESS in the Action Desk app. At **09:00**
+Pricing sees that the segment needs **+62%** while quotes achieve **+2.9%**. By **11:00** the Chief Claims Officer knows
+21 claims carry the wrong cause code and 70 contain personal data, each with a fix. At **17:00** the CFO books event IBNR
+for a **1.6-point** (EUR 10.1m) effect on the quarter. Without the coworker, all of this surfaces in the month-end pack,
+three to six weeks later. The full timeline is in the [README](../README.md#a-day-with-the-chief-underwriting-officer);
+the rest of this page is how each moment is built.
+
 ## The business problem
 
 A commercial P&C insurer sees its loss ratio once a month. In a market where the combined ratio sits around 90–93%,
@@ -54,7 +65,7 @@ Three things make it worse:
 ## Every step and its script
 
 All steps are notebooks or scripts in this repo, and all run in the Lakeflow Job `lrc_end_to_end`
-([`resources/lrc_jobs.yml`](../resources/lrc_jobs.yml)), except the one-off deploy scripts.
+([`databricks.yml`](../databricks.yml)), except the one-off deploy scripts.
 
 | # | Step | Script | Type | Writes |
 |---|---|---|---|---|
@@ -65,18 +76,18 @@ All steps are notebooks or scripts in this repo, and all run in the Lakeflow Job
 | 5 | **Lakebase setup**: instance, database, `ops` and `pricing` schemas, 24k seeded quotes | [`src/lakebase/01_setup_lakebase.py`](../src/lakebase/01_setup_lakebase.py) (+ helper [`_lakebase_conn.py`](../src/lakebase/_lakebase_conn.py)) | notebook | `ops.lr_actions`, `pricing.quotes`, `pricing.rate_actions` |
 | 6 | **Lakebase transactions**: publish actions, record quotes and referrals, propose rate actions, create/refresh the synced table, grant the app | [`src/lakebase/02_publish_and_transact.py`](../src/lakebase/02_publish_and_transact.py) | notebook | Lakebase rows; `lr_watchlist_snapshot` → `lr_watchlist_serving` |
 | 7 | **Lakebase → Delta** snapshot of team status and pricing | [`src/lakebase/03_snapshot_to_delta.py`](../src/lakebase/03_snapshot_to_delta.py) | notebook | `lr_action_status`, `bronze_pricing_quotes`, `bronze_rate_actions` |
-| 8 | **Lakeflow ETL + Gen AI data quality**: bronze (Auto Loader) → silver (expectations, de-dup) → `ai_classify` / `ai_mask` / `ai_query` → gold | [`src/pipeline/lrc_ingest_pipeline.sql`](../src/pipeline/lrc_ingest_pipeline.sql) ([`resources/lrc_pipeline.yml`](../resources/lrc_pipeline.yml)) | Lakeflow SDP (SQL) | `bronze_fnol`, `bronze_premium`, `silver_claims`, `silver_premium`, `silver_claims_ai_checked`, `dq_claims_issues`, `dq_daily_scorecard`, `gold_daily_loss_run_lf`, `gold_rate_adequacy` |
+| 8 | **Lakeflow ETL + Gen AI data quality**: bronze (Auto Loader) → silver (expectations, de-dup) → `ai_classify` / `ai_mask` / `ai_query` → gold | [`src/pipeline/lrc_ingest_pipeline.sql`](../src/pipeline/lrc_ingest_pipeline.sql) ([`databricks.yml`](../databricks.yml)) | Lakeflow SDP (SQL) | `bronze_fnol`, `bronze_premium`, `silver_claims`, `silver_premium`, `silver_claims_ai_checked`, `dq_claims_issues`, `dq_daily_scorecard`, `gold_daily_loss_run_lf`, `gold_rate_adequacy` |
 | 9 | **Gen AI evaluation**: precision/recall against seeded defects + LLM judge (independent model family) of the explanations | [`src/genai/04_evaluate_genai_dq.py`](../src/genai/04_evaluate_genai_dq.py) | notebook | `dq_genai_eval`, `dq_explanation_judge` |
 | 10 | Genie Agent with DQ, team-status and pricing tables | [`deploy/genie_agent.py`](../deploy/genie_agent.py) | script | Genie space |
 | 11 | AI/BI dashboard | [`deploy/dashboard.py`](../deploy/dashboard.py) | script | Lakeview dashboard |
-| 12 | **Action Desk app on Lakebase** | [`app/action_desk/app.py`](../app/action_desk/app.py) ([`resources/lrc_app.yml`](../resources/lrc_app.yml)) | Databricks App | updates `ops.lr_actions`, `pricing.rate_actions` |
+| 12 | **Action Desk app on Lakebase** | [`app/action_desk/app.py`](../app/action_desk/app.py) ([`databricks.yml`](../databricks.yml)) | Databricks App | updates `ops.lr_actions`, `pricing.rate_actions` |
 | 13 | Genie One skill: brief → Slack → Gmail drafts | [`skills/loss-ratio-daily-brief.md`](../skills/loss-ratio-daily-brief.md) | Genie One skill | Slack post, Gmail drafts |
 | 9a | **Unity Catalog governance**: row filter by region and column mask on claim free text, attached by the pipeline | [`src/governance/05_row_filter_column_mask.py`](../src/governance/05_row_filter_column_mask.py) | notebook | `lrc_region_filter`, `lrc_mask_free_text`, `lrc_region_access` |
 | 9b | **ML**: next-7-day claim-frequency forecast, beats a naive baseline, registered in UC (`@champion`), joined with Lakebase team status | [`src/ml/06_train_frequency_forecast.py`](../src/ml/06_train_frequency_forecast.py) | notebook | UC model `lrc_frequency_forecast`, `lr_frequency_forecast`, `lr_forecast_escalations` |
 | 14a | **Genie Agent benchmark**: ask the deployed agent, capture its SQL and result, score against ground truth | [`deploy/genie_benchmark.py`](../deploy/genie_benchmark.py) | script | [`run_evidence/06_genie_agent.md`](run_evidence/06_genie_agent.md) |
 | 14 | Collect run evidence into the repo | [`deploy/collect_run_evidence.py`](../deploy/collect_run_evidence.py) | script | [`docs/run_evidence/`](run_evidence/) |
 
-Infrastructure as code: [`databricks.yml`](../databricks.yml) + [`resources/`](../resources/) (Lakebase instance, pipeline,
+Infrastructure as code: [`databricks.yml`](../databricks.yml) (Lakebase instance, pipeline,
 app, jobs).
 
 ## Gen AI data quality in detail
@@ -132,6 +143,12 @@ week-3 go-live gate (≥ 90%).
 | Chief Claims Officer | Claims leakage, cycle time, data quality | Wrong cause codes and personal data caught on arrival, each with a fix |
 | Head of Reinsurance | Recoveries collected, notification within treaty deadlines | P1 action with a 48-hour due date, tracked to DONE in Lakebase |
 | Chief Pricing Actuary | Rate adequacy, rate change achieved vs plan | Rate action proposed the same morning; RED-segment quotes referred |
+
+**Why they fund it (incentives).** Insurer incentive plans typically weight the combined ratio against plan,
+underwriting profit and return on equity, and penalise adverse reserve development at close; reinsurance leads are
+judged on recoveries collected and net-of-reinsurance results, pricing leads on rate achieved against plan. Every point
+of loss ratio caught a quarter earlier is a point the plan does not miss: the 1.6-pt hailstorm effect is visible in
+days, reserved the same week and priced into renewals before the next cycle, instead of explained after the quarter.
 
 The strategic shift: from a monthly reporting cycle to a daily operating rhythm, where the data platform does not just
 report the loss ratio but routes each signal to an owner and records what was done.

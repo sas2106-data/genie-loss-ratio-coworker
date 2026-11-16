@@ -29,6 +29,11 @@ def run(sql):
 
 # COMMAND ----------
 
+try:   # a replaced table must not carry yesterday's policy; it is re-attached in step 6
+    run("ALTER TABLE gold_daily_loss_run DROP ROW FILTER")
+except Exception:
+    pass
+
 run("""
 CREATE OR REPLACE TABLE gold_daily_loss_run
 COMMENT 'Daily loss run: incurred loss on the date it was reported, earned premium for the day, by line of business and region.'
@@ -364,3 +369,22 @@ for kind, objs in [("TABLE", ["claims", "gold_daily_loss_run", "lr_targets", "in
 # COMMAND ----------
 
 display(spark.sql("SELECT line_of_business, region, status, primary_driver, ROUND(lr_7d,3) lr_7d, ROUND(lr_30d,3) lr_30d, target_loss_ratio, gap_7d_pts FROM v_loss_ratio_watchlist ORDER BY gap_7d_pts DESC"))
+
+# COMMAND ----------
+
+# MAGIC %md ## 6 · Row-level security: each regional team sees only its own book
+# MAGIC `lrc_region_filter(region)` (created by `src/governance/05_row_filter_column_mask.py`) is attached to the governed gold
+# MAGIC table, so the metric views, the dashboard, Genie and Power BI DirectQuery all inherit it: a member of
+# MAGIC `lrc_claims_dach` sees only DACH, `lrc_claims_all` sees every region, and workspace admins (the job owner) see all.
+
+# COMMAND ----------
+
+try:
+    run(f"ALTER TABLE gold_daily_loss_run SET ROW FILTER {CATALOG}.{SCHEMA}.lrc_region_filter ON (region)")
+    display(spark.sql(f"""SELECT table_name, filter_name, target_columns FROM {CATALOG}.information_schema.row_filters
+                          WHERE table_schema = '{SCHEMA}' ORDER BY table_name"""))
+    display(spark.sql(f"""SELECT a.group_name, COUNT(DISTINCT g.region) AS regions_visible, ROUND(SUM(g.incurred_loss) / 1e6, 1) AS incurred_eur_m
+                          FROM gold_daily_loss_run g JOIN {CATALOG}.{SCHEMA}.lrc_region_access a ON a.region = g.region
+                          GROUP BY a.group_name ORDER BY a.group_name"""))
+except Exception as e:
+    print(f"row filter not attached (run src/governance/05_row_filter_column_mask.py first): {str(e).splitlines()[0][:200]}")

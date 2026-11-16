@@ -24,7 +24,7 @@ TABLES = {
     "lr_targets": "Plan loss ratio, expense ratio, alert thresholds and owner team per line of business.",
 }
 
-# Added when the Lakeflow / Gen AI / Lakebase scenario has run (resources/lrc_jobs.yml → lrc_end_to_end)
+# Added when the Lakeflow / Gen AI / Lakebase scenario has run (databricks.yml → lrc_end_to_end)
 EXTENDED_TABLES = {
     "dq_daily_scorecard": "Daily data-quality scorecard from the Lakeflow pipeline: records checked, issues and pass rate per check (rule-based and Gen AI).",
     "dq_claims_issues": "One row per claim data-quality issue (peril mismatch found by ai_classify, personal data found by ai_mask, negative amounts, date and currency errors) with an ai_query explanation and suggested fix. Personal data is masked.",

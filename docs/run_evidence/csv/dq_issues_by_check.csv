@@ -1,5 +1,5 @@
 check_name,check_type,severity,issues
-pii_in_free_text,Gen AI,High,86
-peril_mismatch,Gen AI,High,23
+pii_in_free_text,Gen AI,High,89
+peril_mismatch,Gen AI,High,22
 negative_amount,Rule,Medium,10
 non_eur_currency,Rule,Medium,9

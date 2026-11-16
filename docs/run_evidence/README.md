@@ -5,19 +5,19 @@ Readable, committed output of one real run of the `lrc_end_to_end` Lakeflow Job 
 
 | | |
 |---|---|
-| Run | `485868090598415` · **SUCCESS** · 2026-11-16 05:05:29 UTC |
+| Run | `945039689803583` · **SUCCESS** · 2026-11-16 05:50:41 UTC |
 | Tasks | 11/11 succeeded (notebooks + Lakeflow pipeline + Lakebase) |
 | Lakeflow expectations | 7 rule results recorded · 39 records failed a rule |
-| Gen AI data-quality findings | 109 (ai_classify peril mismatch, ai_mask personal data), each explained by ai_query |
-| Gen AI accuracy vs seeded defects | peril_mismatch (ai_classify): precision 0.913, recall 1.0; pii_in_free_text (ai_mask): precision 0.814, recall 1.0 |
+| Gen AI data-quality findings | 111 (ai_classify peril mismatch, ai_mask personal data), each explained by ai_query |
+| Gen AI accuracy vs seeded defects | peril_mismatch (ai_classify): precision 0.955, recall 1.0; pii_in_free_text (ai_mask): precision 0.787, recall 1.0 |
 | Rule-based findings | 19 (negative amounts, loss after report, non-EUR currency) |
 | Reconciliation | Lakeflow gold incurred differs from original gold by **-2.99%** over 2026-10-18 → 2026-11-16 |
 | Rate adequacy | 6 segment(s) where the achieved rate change is below the indicated rate change |
 | Genie Agent benchmark | 10/10 questions answered correctly from the governed tables ([06_genie_agent.md](06_genie_agent.md)) |
 | Lakebase actions | 16 actions in `ops.lr_actions` with team status |
-| LLM judge of explanations | 40 explanations judged · avg score 3.51/5 · correct check 0.9 · no personal data 1.0 |
-| Unity Catalog policies | 1 row filter(s) and 1 column mask(s) attached in Unity Catalog |
-| ML forecast | UC model v2 scored 20 segments · 3 rising · 1 escalations (rising + Lakebase action OPEN) |
+| LLM judge of explanations | 40 explanations judged · avg score 3.38/5 · correct check 0.83 · no personal data 1.0 |
+| Unity Catalog policies | 2 row filter(s) and 1 column mask(s) attached in Unity Catalog |
+| ML forecast | UC model v3 scored 20 segments · 3 rising · 1 escalations (rising + Lakebase action OPEN) |
 
 | File | What it shows |
 |---|---|

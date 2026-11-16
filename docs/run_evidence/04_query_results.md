@@ -1,6 +1,6 @@
 # 04 · Query results (the business answers)
 
-Run against `<catalog>.loss_ratio_coworker` on a serverless SQL warehouse at 2026-11-16 05:21 UTC. Full results are in [`csv/`](csv/).
+Run against `<catalog>.loss_ratio_coworker` on a serverless SQL warehouse at 2026-11-16 06:09 UTC. Full results are in [`csv/`](csv/).
 
 
 ## Data-quality scorecard, latest report date (rule-based + Gen AI checks)
@@ -32,8 +32,8 @@ SELECT check_name, check_type, severity, count(*) issues FROM <catalog>.loss_rat
 
 | check_name | check_type | severity | issues |
 |---|---|---|---|
-| pii_in_free_text | Gen AI | High | 86 |
-| peril_mismatch | Gen AI | High | 23 |
+| pii_in_free_text | Gen AI | High | 89 |
+| peril_mismatch | Gen AI | High | 22 |
 | negative_amount | Rule | Medium | 10 |
 | non_eur_currency | Rule | Medium | 9 |
 
@@ -52,16 +52,16 @@ SELECT claim_id, report_date, check_name, cause_of_loss, ai_peril, loss_descript
 |---|---|---|---|---|---|---|
 | CLM-3077418 | 2026-11-16 | peril_mismatch | Theft | vehicle collision | Company car collided with a parked vehicle while reversing in Valencia | The issue is a mismatch between the coded cause of loss (Theft) and the peril inferred from the description (vehicle collision), indicating an incorrect classification. The claims handler should update the coded cause of |
 | CLM-3077490 | 2026-11-16 | pii_in_free_text | Property Damage | third-party property damage | Our engineers damaged a client's server room flooring during installation in Bristol. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
-| CLM-3077424 | 2026-11-16 | pii_in_free_text | Cargo Damage | water damage | Container of electronics arrived water-damaged at the port near Leeds. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data quality problem. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
-| CLM-3077459 | 2026-11-16 | pii_in_free_text | Heavy Weather | heavy weather at sea | Heavy seas caused containers to shift and fall overboard en route to Vienna. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
-| CLM-3077401 | 2026-11-16 | pii_in_free_text | Fire | fire | Electrical fire in the production hall in Toulouse; machinery and stock destroyed. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description field contains personal contact information, which is a privacy concern. The claims handler should remove or mask the personal contact information ([MASKED] on [MASKED] or [MASKED]) from |
-| CLM-3077258 | 2026-11-15 | peril_mismatch | Theft | hail | Severe hail shattered greenhouse panels and dented stock vehicles at the Stuttgart site | The issue is a mismatch between the coded cause of loss (Theft) and the peril inferred from the description (hail), which indicates the claim is actually related to hail damage, not theft. The claims handler should updat |
-| CLM-3077226 | 2026-11-15 | peril_mismatch | Theft | hail | Severe hail shattered greenhouse panels and dented stock vehicles at the Vienna site | The issue is a mismatch between the coded cause of loss (Theft) and the peril inferred from the description (hail), indicating an incorrect classification. The claims handler should update the coded cause of loss to "Hai |
+| CLM-3077459 | 2026-11-16 | pii_in_free_text | Heavy Weather | heavy weather at sea | Heavy seas caused containers to shift and fall overboard en route to Vienna. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data quality issue. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
+| CLM-3077401 | 2026-11-16 | pii_in_free_text | Fire | fire | Electrical fire in the production hall in Toulouse; machinery and stock destroyed. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description field contains personal contact information, which is a data quality issue due to the presence of personally identifiable information (PII). The claims handler should remove or mask the  |
+| CLM-3077424 | 2026-11-16 | pii_in_free_text | Cargo Damage | water damage | Container of electronics arrived water-damaged at the port near Leeds. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the coded cause of loss is "Cargo Damage" but the description suggests "water damage", indicating a potential inconsistency. The claims handler should update the coded cause of loss to "Water Damage" to |
 | CLM-3077353 | 2026-11-15 | peril_mismatch | Theft | vehicle collision | Company car collided with a parked vehicle while reversing in Lille | The issue is a mismatch between the coded cause of loss (Theft) and the peril inferred from the description (vehicle collision), indicating an incorrect classification. The claims handler should update the coded cause of |
-| CLM-3077274 | 2026-11-15 | pii_in_free_text | Flood | flood | River flooding entered the ground floor of the Lille depot, water 40cm deep. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
+| CLM-3077226 | 2026-11-15 | peril_mismatch | Theft | hail | Severe hail shattered greenhouse panels and dented stock vehicles at the Vienna site | The issue is a mismatch between the coded cause of loss (Theft) and the peril inferred from the description (hail), indicating an incorrect classification. The claims handler should update the coded cause of loss to "Hai |
+| CLM-3077258 | 2026-11-15 | peril_mismatch | Theft | hail | Severe hail shattered greenhouse panels and dented stock vehicles at the Stuttgart site | The issue is a mismatch between the coded cause of loss (Theft) and the peril inferred from the description (hail), indicating an incorrect classification. The claims handler should update the coded cause of loss to "Hai |
+| CLM-3077299 | 2026-11-15 | pii_in_free_text | Third-Party PD | third-party property damage | Our vehicle damaged a third-party bus shelter in Stuttgart. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data quality problem. The claims handler should remove or mask the personal contact information ([MASKED] on [MASKED] or [MASKED]) from  |
 | CLM-3077360 | 2026-11-15 | pii_in_free_text | Hail | hail | Hailstones damaged roof tiles and skylights at the insured warehouse in Vienna. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data quality problem. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
-| CLM-3077229 | 2026-11-15 | pii_in_free_text | Collision | vehicle collision | Company car collided with a parked vehicle while reversing in Zurich. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a data privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
-| CLM-3077298 | 2026-11-15 | pii_in_free_text | Fire | fire | Kitchen fire spread to the dining area of the insured restaurant in Antwerp. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
+| CLM-3077274 | 2026-11-15 | pii_in_free_text | Flood | flood | River flooding entered the ground floor of the Lille depot, water 40cm deep. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
+| CLM-3077229 | 2026-11-15 | pii_in_free_text | Collision | vehicle collision | Company car collided with a parked vehicle while reversing in Zurich. Contact [MASKED] on [MASKED] or [MASKED] | The issue is that the description contains personal contact information, which is a privacy concern. The claims handler should remove or mask the personal contact information from the description to fix the issue. |
 
 
 ## Gen AI check accuracy against seeded defects (src/genai/04_evaluate_genai_dq.py)
@@ -77,8 +77,8 @@ SELECT check_name, genai_function, claims_checked, seeded_defects, flagged, true
 
 | check_name | genai_function | claims_checked | seeded_defects | flagged | true_positives | false_positives | false_negatives | precision | recall | f1 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| peril_mismatch | ai_classify | 1981 | 21 | 23 | 21 | 2 | 0 | 0.913 | 1.0 | 0.955 |
-| pii_in_free_text | ai_mask | 1981 | 70 | 86 | 70 | 16 | 0 | 0.814 | 1.0 | 0.897 |
+| peril_mismatch | ai_classify | 1981 | 21 | 22 | 21 | 1 | 0 | 0.955 | 1.0 | 0.977 |
+| pii_in_free_text | ai_mask | 1981 | 70 | 89 | 70 | 19 | 0 | 0.787 | 1.0 | 0.881 |
 
 
 ## ai_classify peril vs. recorded cause code (sample of mismatches)
@@ -94,15 +94,15 @@ SELECT claim_id, cause_of_loss, ai_peril, peril_consistent, pii_detected, loss_d
 | claim_id | cause_of_loss | ai_peril | peril_consistent | pii_detected | loss_description_masked |
 |---|---|---|---|---|---|
 | CLM-3075754 | Theft | vehicle collision | false | false | Delivery van rear-ended at traffic lights in Nantes, bumper and tailgate damaged |
-| CLM-3076076 | Theft | cargo theft | false | false | Thieves cut the fence at the Antwerp yard and removed copper cable |
-| CLM-3076053 | Water Damage | fire | false | false | Kitchen fire spread to the dining area of the insured restaurant in Nantes |
 | CLM-3075958 | Theft | vehicle collision | false | false | Delivery van rear-ended at traffic lights in Liège, bumper and tailgate damaged |
-| CLM-3076151 | Theft | cargo theft | false | false | Thieves cut the fence at the Rotterdam yard and removed copper cable |
+| CLM-3076053 | Water Damage | fire | false | false | Kitchen fire spread to the dining area of the insured restaurant in Nantes |
+| CLM-3076234 | Professional Error | bodily injury | false | false | Visitor slipped on a wet floor at the Manchester premises and fractured a wrist |
+| CLM-3076215 | Theft | vehicle collision | false | false | Delivery van rear-ended at traffic lights in Nantes, bumper and tailgate damaged |
 | CLM-3076160 | Theft | vehicle collision | false | false | Delivery van rear-ended at traffic lights in Zurich, bumper and tailgate damaged |
+| CLM-3076403 | Theft | cargo theft | false | false | Thieves cut the fence at the Rotterdam yard and removed copper cable |
 | CLM-3076450 | Theft | vehicle collision | false | false | Delivery van rear-ended at traffic lights in Valencia, bumper and tailgate damaged |
 | CLM-3076477 | Theft | vehicle collision | false | false | Delivery van rear-ended at traffic lights in Stuttgart, bumper and tailgate damaged |
-| CLM-3076234 | Professional Error | bodily injury | false | false | Visitor slipped on a wet floor at the Manchester premises and fractured a wrist |
-| CLM-3076215 | Theft | vehicle collision | false |  |  |
+| CLM-3076520 | Theft | hail | false | false | Hailstones damaged roof tiles and skylights at the insured warehouse in Stuttgart |
 
 
 ## Row counts through the medallion
@@ -126,7 +126,7 @@ SELECT 'bronze_fnol' layer, count(*) rows FROM <catalog>.loss_ratio_coworker.bro
 | silver_premium | 590 |
 | bronze_fnol | 3750 |
 | silver_claims_ai_checked | 1981 |
-| dq_claims_issues | 128 |
+| dq_claims_issues | 130 |
 | bronze_premium | 600 |
 | gold_daily_loss_run_lf | 590 |
 

@@ -4,9 +4,9 @@
 
 | Name | State | Capacity | Postgres | Read/write DNS |
 |---|---|---|---|---|
-| `lrc-lakebase` | AVAILABLE | CU_1 | PG_VERSION_16 | `ep-wispy-pine-d2mlyr2v.database.us-east-1.cloud.databricks.com` |
+| `lrc-lakebase` | AVAILABLE | CU_1 | PG_VERSION_16 | `<lakebase-host>` |
 
-Defined in [`resources/lrc_lakebase.yml`](../../resources/lrc_lakebase.yml). Database `lrc_ops`, schemas `ops` and `pricing`
+Defined in [`databricks.yml`](../../databricks.yml). Database `lrc_ops`, schemas `ops` and `pricing`
 ([`src/lakebase/01_setup_lakebase.py`](../../src/lakebase/01_setup_lakebase.py)).
 
 ## Synced table (Delta → Lakebase, for millisecond reads in the app)

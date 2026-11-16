@@ -10,7 +10,21 @@
 # MAGIC 3. **Recommend**: map the driver to a deterministic **action playbook** per downstream team (Claims, Underwriting,
 # MAGIC    Pricing, Reinsurance, Reserving, Finance). The playbook is rules, not an LLM, so actions are auditable.
 # MAGIC 4. **Record**: write alerts and actions to Delta (`lr_alerts`, `lr_action_recommendations`) for follow-up and audit.
+# MAGIC    - 4b **Publish to Lakebase**: insert each action into the operational Postgres table `ops.lr_actions`
+# MAGIC      (`ON CONFLICT DO NOTHING`, so a team's status, owner and note are never overwritten). Teams update it in the
+# MAGIC      Action Desk app; `src/lakebase/03_snapshot_to_delta.py` copies it back as `lr_action_status`.
+# MAGIC    - 4c **LLM judge (Gen AI)**: `ai_query` asks an independent model to grade every Genie explanation stored in
+# MAGIC      `lr_alerts` (grounded in the numbers? names the driver? actionable?) and appends the verdicts to `lr_explanation_judge`,
+# MAGIC      so explanation quality is tracked over time instead of assumed.
 # MAGIC 5. **Notify**: post a Slack message (Block Kit) and a Microsoft Teams card (Adaptive Card) to each team's channel.
+
+# COMMAND ----------
+
+# MAGIC %pip install -q "databricks-sdk>=0.65" "psycopg[binary]>=3.2"
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -19,12 +33,18 @@ dbutils.widgets.text("schema", "loss_ratio_coworker")
 dbutils.widgets.text("genie_space_id", "")
 dbutils.widgets.text("secret_scope", "loss_ratio_coworker")
 dbutils.widgets.dropdown("dry_run", "true", ["true", "false"])
+dbutils.widgets.text("lakebase_instance", "lrc-lakebase")
+dbutils.widgets.text("lakebase_database", "lrc_ops")
+dbutils.widgets.text("judge_endpoint", "databricks-claude-sonnet-5-5")
 
 CATALOG = dbutils.widgets.get("catalog") or spark.sql("SELECT current_catalog()").first()[0]
 SCHEMA = dbutils.widgets.get("schema")
 SPACE_ID = dbutils.widgets.get("genie_space_id")
 SCOPE = dbutils.widgets.get("secret_scope")
 DRY_RUN = dbutils.widgets.get("dry_run") == "true"
+LAKEBASE_INSTANCE = dbutils.widgets.get("lakebase_instance")
+LAKEBASE_DB = dbutils.widgets.get("lakebase_database")
+JUDGE = dbutils.widgets.get("judge_endpoint")
 FQ = f"`{CATALOG}`.`{SCHEMA}`"
 
 # COMMAND ----------
@@ -149,6 +169,69 @@ if alerts:
     (spark.createDataFrame(pd.DataFrame(actions)).withColumn("created_at", F.current_timestamp())
         .write.mode("append").option("mergeSchema", "true").saveAsTable(f"{FQ}.lr_action_recommendations"))
 print(f"recorded {len(alerts)} alerts and {len(actions)} actions")
+
+# COMMAND ----------
+
+# MAGIC %md ## 4b · Publish the actions to Lakebase (operational store for team status)
+# MAGIC Delta keeps the audit trail; Lakebase Postgres holds the rows teams change during the day. The insert is idempotent and
+# MAGIC never overwrites a team's update.
+
+# COMMAND ----------
+
+# MAGIC %run ../lakebase/_lakebase_conn
+
+# COMMAND ----------
+
+inst = ensure_instance(LAKEBASE_INSTANCE)
+with connect(inst, LAKEBASE_DB) as c:
+    with c.transaction():
+        new = 0
+        for x in actions:
+            a = next(al for al in alerts if al["alert_id"] == x["alert_id"])
+            cur = c.execute("""INSERT INTO ops.lr_actions (action_id, alert_id, as_of_date, line_of_business, region, alert_status,
+                                 primary_driver, team, priority, action, due_within)
+                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (action_id) DO NOTHING""",
+                            (f"{x['alert_id']}:{x['team']}", x["alert_id"], a["as_of_date"], a["line_of_business"], a["region"],
+                             a["status"], a["primary_driver"], x["team"], x["priority"], x["action"], x["due_within"]))
+            new += cur.rowcount
+    status = c.execute("SELECT team, status, count(*) FROM ops.lr_actions GROUP BY team, status ORDER BY team, status").fetchall()
+print(f"Lakebase ops.lr_actions: {new} new actions published, {len(actions) - new} already there (team updates kept)")
+for team, st, n in status:
+    print(f"  {team:<12} {st:<12} {n}")
+
+# COMMAND ----------
+
+# MAGIC %md ## 4c · LLM judge: grade today's Genie explanations (Gen AI quality, tracked over time)
+
+# COMMAND ----------
+
+judged = spark.sql(f"""
+WITH today AS (
+  SELECT alert_id, line_of_business, region, status, primary_driver, lr_7d, target_loss_ratio, genie_explanation
+  FROM {FQ}.lr_alerts WHERE as_of_date = (SELECT MAX(as_of_date) FROM {FQ}.lr_alerts) AND genie_explanation IS NOT NULL
+),
+j AS (
+  SELECT *, ai_query('{JUDGE}', concat(
+    'You audit explanations written by an analytics assistant for insurance executives. Reply with JSON only: ',
+    '{{"grounded": true|false, "names_driver": true|false, "actionable": true|false, "score": 1-5, "reason": "<max 20 words>"}}. ',
+    'grounded: its numbers agree with the FACTS. names_driver: it identifies the driver given in the FACTS. ',
+    'actionable: an executive knows what to look at next. ',
+    'FACTS: segment ', line_of_business, ' / ', region, ', status ', status, ', 7-day loss ratio ', cast(round(lr_7d * 100, 1) AS STRING),
+    '%, target ', cast(round(target_loss_ratio * 100, 1) AS STRING), '%, driver ', primary_driver,
+    '. EXPLANATION: ', genie_explanation)) AS verdict_raw
+  FROM today
+)
+SELECT current_timestamp() AS judged_at, '{JUDGE}' AS judge_endpoint, alert_id, line_of_business, region, primary_driver,
+       from_json(regexp_extract(verdict_raw, '[{{].*[}}]', 0),
+                 'grounded BOOLEAN, names_driver BOOLEAN, actionable BOOLEAN, score INT, reason STRING') AS v
+FROM j
+""").selectExpr("judged_at", "judge_endpoint", "alert_id", "line_of_business", "region", "primary_driver", "v.*")
+judged.write.mode("append").option("mergeSchema", "true").saveAsTable(f"{FQ}.lr_explanation_judge")
+spark.sql(f"COMMENT ON TABLE {FQ}.lr_explanation_judge IS 'LLM-judge verdicts on the Genie explanations stored in lr_alerts, appended every run.'")
+display(judged.select("alert_id", "primary_driver", "grounded", "names_driver", "actionable", "score", "reason"))
+display(spark.sql(f"""SELECT date(judged_at) AS day, COUNT(*) AS explanations, ROUND(AVG(score), 2) AS avg_score,
+                             ROUND(AVG(CAST(grounded AS INT)), 2) AS grounded, ROUND(AVG(CAST(names_driver AS INT)), 2) AS names_driver
+                      FROM {FQ}.lr_explanation_judge GROUP BY ALL ORDER BY day"""))
 
 # COMMAND ----------
 

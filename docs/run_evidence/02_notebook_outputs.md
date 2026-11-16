@@ -80,7 +80,7 @@ As of 2026-11-16: book loss ratio 63.3% | 77,527 claims | seeded events: 238 hai
 **Cell** `inst = ensure_instance(INSTANCE)`
 
 ```text
-Lakebase instance lrc-lakebase · host ep-wispy-pine-d2mlyr2v.database.us-east-1.cloud.databricks.com · database lrc_ops
+Lakebase instance lrc-lakebase · host <lakebase-host> · database lrc_ops
 schemas ops, pricing and tables ready
 ```
 
@@ -146,6 +146,21 @@ Landed 30 days (2026-10-18 → 2026-11-16) into /Volumes/<catalog>/loss_ratio_co
 | Motor | France | GREEN | Within normal variation | 0.549 | 0.679 | 0.7 | -15.1 |
 | Property | France | GREEN | Within normal variation | 0.419 | 0.556 | 0.6 | -18.1 |
 
+**Cell** `try:`
+
+| table_name | filter_name | target_columns |
+|---|---|---|
+| gold_daily_loss_run | <catalog>.loss_ratio_coworker.lrc_region_filter | region |
+| silver_claims | <catalog>.loss_ratio_coworker.lrc_region_filter | region |
+| group_name | regions_visible | incurred_eur_m |
+|---|---|---|
+| lrc_claims_all | 5 | 3109.2 |
+| lrc_claims_benelux | 1 | 366.1 |
+| lrc_claims_dach | 1 | 752.1 |
+| lrc_claims_france | 1 | 619.5 |
+| lrc_claims_southern_europe | 1 | 564.9 |
+| lrc_claims_uk | 1 | 806.6 |
+
 ## Task `watch_and_explain` · `src/jobs/daily_loss_ratio_watch`
 
 
@@ -169,23 +184,67 @@ Landed 30 days (2026-10-18 → 2026-11-16) into /Volumes/<catalog>/loss_ratio_co
 recorded 6 alerts and 16 actions
 ```
 
+**Cell** `inst = ensure_instance(LAKEBASE_INSTANCE)`
+
+```text
+Lakebase ops.lr_actions: 0 new actions published, 16 already there (team updates kept)
+  Claims       ACKNOWLEDGED 1
+  Claims       IN_PROGRESS  1
+  Claims       OPEN         2
+  Finance      OPEN         1
+  Pricing      OPEN         2
+  Reinsurance  OPEN         2
+  Reserving    OPEN         1
+  Underwriting OPEN         6
+```
+
+**Cell** `judged = spark.sql(f"""`
+
+| alert_id | primary_driver | grounded | names_driver | actionable | score | reason |
+|---|---|---|---|---|---|---|
+| LR-20261116-PRO-DACH | Catastrophe event | True | True | True | 4 | Figures match the FACTS and the 205.9-point gap is correct; '+5.198x' is ambiguous (the ratio is about 6.2x), but the hail event is clearly named. |
+| LR-20261116-LIA-SOUT | Large loss | True | True | True | 4 | Figures match the FACTS and large loss is named. The 4.0% frequency rise is slightly off (about 3.9%). The next step is implied rather than stated. |
+| LR-20261116-MOT-UK | Frequency | True | True | True | 4 | Loss ratio, target, gap and change percentages check out; frequency named as driver; collision focus points to next steps, though no explicit recommendation. |
+| LR-20261116-LIA-UK | Within normal variation | True | False | False | 2 | Headline numbers match, but it asserts a frequency-led driver instead of 'Within normal variation' and gives no next step. |
+| LR-20261116-PRO-UK | Within normal variation | True | True | True | 4 | 72.8%, 60.0% and the 12.8-point gap match the FACTS, and the driver is cited. Other figures are unverifiable. It points to Water Damage and frequency but gives no explicit next step. |
+| LR-20261116-LIA-FRAN | Frequency | True | True | True | 4 | Figures reconcile with the facts and internally; frequency is named as the driver. No explicit next step, but cause breakdown guides review. |
+| LR-20261116-PRO-DACH | Catastrophe event | True | True | True | 4 | Loss ratio, target and 205.9-point gap match the FACTS; catastrophe driver named; Hailstorm DACH gives a clear focus, though the frequency/severity units are unclear. |
+| LR-20261116-LIA-SOUT | Large loss | True | True | True | 4 | Loss ratio, target and gap match the FACTS, and Large loss is named. Extra figures are consistent but unverifiable; no explicit next step. |
+| LR-20261116-MOT-UK | Frequency | True | True | True | 3 | Loss ratio, target, gap and Frequency driver match the FACTS. Duplicate Collision rows and unexplained cat incurred amount alongside 'Attritional' tags confuse the picture. |
+| LR-20261116-LIA-UK | Within normal variation | True | True | False | 2 | Headline figures match the FACTS, but the frequency-over-severity claim conflicts with its own severity data. Raw unrounded numbers and no clear next step. |
+| LR-20261116-PRO-UK | Within normal variation | True | True | True | 3 | Stated figures match the FACTS and the driver is named, but 'driven by frequency and severity' conflicts with 'normal variation'. Extra figures can't be verified, and no next step is given. |
+| LR-20261116-LIA-FRAN | Frequency | True | True | True | 4 | Loss ratio, target, and 10.8-point gap match FACTS; frequency named as driver; extra figures unverifiable; top causes guide next steps. |
+| LR-20261116-PRO-DACH | Catastrophe event | True | True | True | 4 | Figures are internally consistent and match the facts. Catastrophe losses and the Hailstorm DACH event are named, though only as a secondary point after frequency. |
+| LR-20261116-LIA-SOUT | Large loss | True | True | True | 4 | Figures are consistent with the FACTS and each other; severity and 3 large losses (EUR 3.14m) are the driver, though not explicitly labeled. |
+| LR-20261116-MOT-UK | Frequency | True | True | False | 3 | Figures match the FACTS, but it dilutes the frequency driver with severity, shows catastrophe EUR 3.14M above the 'top' Attritional EUR 2.25M, and gives no clear next step. |
+| LR-20261116-LIA-UK | Within normal variation | True | False | True | 3 | Numbers are consistent with the FACTS, but it never says the driver is within normal variation and instead blames severity. |
+| LR-20261116-PRO-UK | Within normal variation | True | False | True | 3 | 72.8%, 60.0% target and 12.8-point gap match; but it never says 'within normal variation', instead blaming frequency and severity for a 34-point rise. |
+| LR-20261116-LIA-FRAN | Frequency | True | True | True | 3 | Figures match FACTS and frequency is named as driver; but the opening question is off-format and calling all claims catastrophe/event is dubious. |
+| LR-20261116-PRO-DACH | Catastrophe event | True | True | True | 4 | Loss ratio, target, gap (205.9 pts) and driver match the FACTS; extra figures are unverifiable, and 'Attritional' as catastrophe-related is muddled. |
+| LR-20261116-LIA-SOUT | Large loss | True | True | True | 4 | Loss ratio, target, 143-point gap and large-loss driver match FACTS; extra figures are unverifiable but plausible; points to specific large claims. |
+
+_16 more rows in the CSV._
+| day | explanations | avg_score | grounded | names_driver |
+|---|---|---|---|---|
+| 2026-11-16 | 36 | 3.14 | 0.81 | 0.72 |
+
 **Cell** `import json, requests`
 
 ```text
 [slack dry-run] LR-20261116-PRO-DACH
-{"text": "Loss ratio RED: Property / DACH", "blocks": [{"type": "header", "text": {"type": "plain_text", "text": "Loss ratio alert: Property, DACH"}}, {"type": "section", "fields": [{"type": "mrkdwn", "text": "*Status*\n:red_circle: RED"}, {"type": "mrkdwn", "text": "*Driver*\nCatastrophe event"}, {"type": "mrkdwn", "text": "*7-day LR*\n266% vs target 60% (+206 pts)"}, {"type": "mrkdwn", "text": "*30-day LR*\n98%"}]}, {"type": "section", "text": {"type": "mrkdwn", "text": "*Why (Genie)*\n- **Property DACH loss ratio rose to 265.9%**, up **219.6 percentage points** from **46.3%** in the prior 7...
+{"text": "Loss ratio RED: Property / DACH", "blocks": [{"type": "header", "text": {"type": "plain_text", "text": "Loss ratio alert: Property, DACH"}}, {"type": "section", "fields": [{"type": "mrkdwn", "text": "*Status*\n:red_circle: RED"}, {"type": "mrkdwn", "text": "*Driver*\nCatastrophe event"}, {"type": "mrkdwn", "text": "*7-day LR*\n266% vs target 60% (+206 pts)"}, {"type": "mrkdwn", "text": "*30-day LR*\n98%"}]}, {"type": "section", "text": {"type": "mrkdwn", "text": "*Why (Genie)*\n- **Property DACH 7-day loss ratio is 265.9%**, up from **46.3%** in the prior 7 days and **205.9 percentag...
 
 [teams dry-run] LR-20261116-PRO-DACH
 {"type": "message", "attachments": [{"contentType": "application/vnd.microsoft.card.adaptive", "content": {"$schema": "http://adaptivecards.io/schemas/adaptive-card.json", "type": "AdaptiveCard", "version": "1.4", "body": [{"type": "TextBlock", "size": "Large", "weight": "Bolder", "text": "Loss ratio RED: Property, DACH", "color": "Attention"}, {"type": "FactSet", "facts": [{"title": "Driver", "value": "Catastrophe event"}, {"title": "7-day LR", "value": "266% (target 60%, +206 pts)"}, {"title": "30-day LR", "value": "98%"}, {"title": "Alert", "value": "LR-20261116-PRO-DACH"}]}, {"type": "Text...
 
 [slack dry-run] LR-20261116-LIA-SOUT
-{"text": "Loss ratio RED: Liability / Southern Europe", "blocks": [{"type": "header", "text": {"type": "plain_text", "text": "Loss ratio alert: Liability, Southern Europe"}}, {"type": "section", "fields": [{"type": "mrkdwn", "text": "*Status*\n:red_circle: RED"}, {"type": "mrkdwn", "text": "*Driver*\nLarge loss"}, {"type": "mrkdwn", "text": "*7-day LR*\n209% vs target 66% (+143 pts)"}, {"type": "mrkdwn", "text": "*30-day LR*\n94%"}]}, {"type": "section", "text": {"type": "mrkdwn", "text": "*Why (Genie)*\n- **Liability in Southern Europe is at 209.0%**, which is **143.0 percentage points above*...
+{"text": "Loss ratio RED: Liability / Southern Europe", "blocks": [{"type": "header", "text": {"type": "plain_text", "text": "Loss ratio alert: Liability, Southern Europe"}}, {"type": "section", "fields": [{"type": "mrkdwn", "text": "*Status*\n:red_circle: RED"}, {"type": "mrkdwn", "text": "*Driver*\nLarge loss"}, {"type": "mrkdwn", "text": "*7-day LR*\n209% vs target 66% (+143 pts)"}, {"type": "mrkdwn", "text": "*30-day LR*\n94%"}]}, {"type": "section", "text": {"type": "mrkdwn", "text": "*Why (Genie)*\n- **Liability in Southern Europe rose to 209.0%** over the last 7 days, up **164.9 percent...
 
 [teams dry-run] LR-20261116-LIA-SOUT
 {"type": "message", "attachments": [{"contentType": "application/vnd.microsoft.card.adaptive", "content": {"$schema": "http://adaptivecards.io/schemas/adaptive-card.json", "type": "AdaptiveCard", "version": "1.4", "body": [{"type": "TextBlock", "size": "Large", "weight": "Bolder", "text": "Loss ratio RED: Liability, Southern Europe", "color": "Attention"}, {"type": "FactSet", "facts": [{"title": "Driver", "value": "Large loss"}, {"title": "7-day LR", "value": "209% (target 66%, +143 pts)"}, {"title": "30-day LR", "value": "94%"}, {"title": "Alert", "value": "LR-20261116-LIA-SOUT"}]}, {"type": ...
 
 [slack dry-run] LR-20261116-MOT-UK
-{"text": "Loss ratio RED: Motor / UK & Ireland", "blocks": [{"type": "header", "text": {"type": "plain_text", "text": "Loss ratio alert: Motor, UK & Ireland"}}, {"type": "section", "fields": [{"type": "mrkdwn", "text": "*Status*\n:red_circle: RED"}, {"type": "mrkdwn", "text": "*Driver*\nFrequency"}, {"type": "mrkdwn", "text": "*7-day LR*\n104% vs target 70% (+34 pts)"}, {"type": "mrkdwn", "text": "*30-day LR*\n84%"}]}, {"type": "section", "text": {"type": "mrkdwn", "text": "*Why (Genie)*\nYou want to understand why the Motor line of business loss ratio in the UK & Ireland region increased over...
+{"text": "Loss ratio RED: Motor / UK & Ireland", "blocks": [{"type": "header", "text": {"type": "plain_text", "text": "Loss ratio alert: Motor, UK & Ireland"}}, {"type": "section", "fields": [{"type": "mrkdwn", "text": "*Status*\n:red_circle: RED"}, {"type": "mrkdwn", "text": "*Driver*\nFrequency"}, {"type": "mrkdwn", "text": "*7-day LR*\n104% vs target 70% (+34 pts)"}, {"type": "mrkdwn", "text": "*30-day LR*\n84%"}]}, {"type": "section", "text": {"type": "mrkdwn", "text": "*Why (Genie)*\n- **Motor UK & Ireland** loss ratio for the last 7 days was **103.5%**, up **7.3 percentage points** from ...
 
 [teams dry-run] LR-20261116-MOT-UK
 {"type": "message", "attachments": [{"contentType": "application/vnd.microsoft.card.adaptive", "content": {"$schema": "http://adaptivecards.io/schemas/adaptive-card.json", "type": "AdaptiveCard", "version": "1.4", "body": [{"type": "TextBlock", "size": "Large", "weight": "Bolder", "text": "Loss ratio RED: Motor, UK & Ireland", "color": "Attention"}, {"type": "FactSet", "facts": [{"title": "Driver", "value": "Frequency"}, {"title": "7-day LR", "value": "104% (target 70%, +34 pts)"}, {"title": "30-day LR", "value": "84%"}, {"title": "Alert", "value": "LR-20261116-MOT-UK"}]}, {"type": "TextBlock"...
@@ -200,13 +259,13 @@ recorded 6 alerts and 16 actions
 **Cell** `inst = ensure_instance(INSTANCE)`
 
 ```text
-400 actions for 6 alerts; 20 watchlist segments
+576 actions for 6 alerts; 20 watchlist segments
 ```
 
 **Cell** `import time`
 
 ```text
-published 0 new actions · proposed 0 rate actions
+16 actions for today already in Lakebase (published by the daily watch) · proposed 0 rate actions
 ops.lr_actions 16
 pricing.quotes 24300
 pricing.rate_actions 2
@@ -265,12 +324,12 @@ granted app lrc-action-desk (<service-principal>) access to ops, pricing and syn
 
 ```text
 If you are using MLflow Tracing, you can migrate your traces to Unity Catalog for unlimited storage, fine-grained access controls, and queryability from notebooks, SQL, and dashboards. Learn more: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/migrate-traces-to-uc
-2026/11/16 05:15:10 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/11/16 06:03:17 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
 🔗 View Logged Model at: <workspace-url>
 Registered model '<catalog>.loss_ratio_coworker.lrc_frequency_forecast' already exists. Creating a new version of this model...
 ```
 ```text
-🔗 Created version '2' of model '<catalog>.loss_ratio_coworker.lrc_frequency_forecast': <workspace-url>
+🔗 Created version '3' of model '<catalog>.loss_ratio_coworker.lrc_frequency_forecast': <workspace-url>
 ```
 ```text
 hold-out MAE: model 5.44 vs naive 6.84 claims/week → +20.4% better than naive
@@ -279,33 +338,33 @@ hold-out MAE: model 5.44 vs naive 6.84 claims/week → +20.4% better than naive
 **Cell** `from mlflow import MlflowClient`
 
 ```text
-<catalog>.loss_ratio_coworker.lrc_frequency_forecast v2 → alias champion
+<catalog>.loss_ratio_coworker.lrc_frequency_forecast v3 → alias champion
 ```
 
 **Cell** `champion = mlflow.sklearn.load_model(f"models:/{MODEL}@champion")`
 
 | as_of_date | line_of_business | region | claims_last7 | forecast_next7_claims | weekly_avg_last4 | forecast_vs_4wk_avg_pct | frequency_outlook | model_version |
 |---|---|---|---|---|---|---|---|---|
-| 2026-11-11T00:00:00.000Z | Marine | Benelux | 8.0 | 10.8 | 8.25 | 30.9 | RISING | 2 |
-| 2026-11-11T00:00:00.000Z | Liability | UK & Ireland | 26.0 | 29.7 | 24.25 | 22.5 | RISING | 2 |
-| 2026-11-11T00:00:00.000Z | Property | Southern Europe | 24.0 | 37.1 | 32.0 | 15.9 | RISING | 2 |
-| 2026-11-11T00:00:00.000Z | Marine | France | 16.0 | 18.6 | 16.25 | 14.5 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Marine | Southern Europe | 12.0 | 15.6 | 14.0 | 11.4 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Marine | DACH | 23.0 | 22.3 | 21.0 | 6.2 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Property | UK & Ireland | 46.0 | 48.4 | 46.75 | 3.5 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Liability | Benelux | 20.0 | 13.9 | 13.5 | 3.0 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Motor | France | 85.0 | 85.1 | 83.0 | 2.5 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Motor | Benelux | 56.0 | 53.3 | 52.25 | 2.0 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Property | France | 39.0 | 38.2 | 38.25 | -0.1 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Property | Benelux | 22.0 | 23.1 | 23.5 | -1.7 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Motor | Southern Europe | 87.0 | 75.8 | 78.75 | -3.7 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Motor | DACH | 98.0 | 92.1 | 96.0 | -4.1 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Liability | Southern Europe | 17.0 | 20.1 | 21.0 | -4.3 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Property | DACH | 81.0 | 47.9 | 50.25 | -4.7 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Liability | DACH | 27.0 | 24.9 | 26.75 | -6.9 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Liability | France | 19.0 | 21.6 | 23.75 | -9.1 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Marine | UK & Ireland | 21.0 | 21.5 | 25.0 | -14.0 | STABLE | 2 |
-| 2026-11-11T00:00:00.000Z | Motor | UK & Ireland | 149.0 | 109.1 | 127.25 | -14.3 | STABLE | 2 |
+| 2026-11-11T00:00:00.000Z | Marine | Benelux | 8.0 | 10.8 | 8.25 | 30.9 | RISING | 3 |
+| 2026-11-11T00:00:00.000Z | Liability | UK & Ireland | 26.0 | 29.7 | 24.25 | 22.5 | RISING | 3 |
+| 2026-11-11T00:00:00.000Z | Property | Southern Europe | 24.0 | 37.1 | 32.0 | 15.9 | RISING | 3 |
+| 2026-11-11T00:00:00.000Z | Marine | France | 16.0 | 18.6 | 16.25 | 14.5 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Marine | Southern Europe | 12.0 | 15.6 | 14.0 | 11.4 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Marine | DACH | 23.0 | 22.3 | 21.0 | 6.2 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Property | UK & Ireland | 46.0 | 48.4 | 46.75 | 3.5 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Liability | Benelux | 20.0 | 13.9 | 13.5 | 3.0 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Motor | France | 85.0 | 85.1 | 83.0 | 2.5 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Motor | Benelux | 56.0 | 53.3 | 52.25 | 2.0 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Property | France | 39.0 | 38.2 | 38.25 | -0.1 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Property | Benelux | 22.0 | 23.1 | 23.5 | -1.7 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Motor | Southern Europe | 87.0 | 75.8 | 78.75 | -3.7 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Motor | DACH | 98.0 | 92.1 | 96.0 | -4.1 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Liability | Southern Europe | 17.0 | 20.1 | 21.0 | -4.3 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Property | DACH | 81.0 | 47.9 | 50.25 | -4.7 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Liability | DACH | 27.0 | 24.9 | 26.75 | -6.9 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Liability | France | 19.0 | 21.6 | 23.75 | -9.1 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Marine | UK & Ireland | 21.0 | 21.5 | 25.0 | -14.0 | STABLE | 3 |
+| 2026-11-11T00:00:00.000Z | Motor | UK & Ireland | 149.0 | 109.1 | 127.25 | -14.3 | STABLE | 3 |
 
 **Cell** `esc = spark.sql(f"""`
 
@@ -331,15 +390,15 @@ hold-out MAE: model 5.44 vs naive 6.84 claims/week → +20.4% better than naive
 | CLM-3075865 | 2026-11-04 | Collision | Collision | vehicle collision | Company car collided with a parked vehicle while reversing in Zurich. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
 | CLM-3075874 | 2026-11-04 | Storm/Wind | Storm/Wind | storm or wind | Fallen tree after windstorm damaged the office facade in Munich. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
 | CLM-3075880 | 2026-11-04 | Third-Party BI | Third-Party BI | bodily injury | Cyclist reports neck injury after collision with fleet car in Porto. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
-| CLM-3075899 | 2026-11-05 | Cargo Damage | Cargo Damage | water damage | Container of electronics arrived water-damaged at the port near Bristol. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
+| CLM-3075899 | 2026-11-05 | Cargo Damage | Cargo Damage | cargo damage | Container of electronics arrived water-damaged at the port near Bristol. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
 | CLM-3075901 | 2026-11-05 | Collision | Collision | vehicle collision | Company car collided with a parked vehicle while reversing in Stuttgart. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
+| CLM-3075908 | 2026-11-05 | Bodily Injury | Bodily Injury | bodily injury | [MASKED] slipped on a wet floor at the Liège premises and fractured a wrist | False | False | False | True |
 | CLM-3075927 | 2026-11-05 | Third-Party BI | Third-Party BI | bodily injury | Pedestrian injured when our delivery vehicle mounted the kerb in Lyon. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
+| CLM-3075932 | 2026-11-05 | Theft | Theft | theft | [MASKED] cut the fence at the Vienna yard and removed copper cable | False | False | False | True |
 | CLM-3075958 | 2026-11-05 | Theft | Collision | vehicle collision | Delivery van rear-ended at traffic lights in Liège, bumper and tailgate damaged | True | True | False | False |
 | CLM-3075977 | 2026-11-05 | Collision | Collision | vehicle collision | Delivery van rear-ended at traffic lights in Lyon, bumper and tailgate damaged. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
 | CLM-3075980 | 2026-11-05 | Hail | Hail | hail | Hailstones damaged roof tiles and skylights at the insured warehouse in Manchester. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
-| CLM-3075981 | 2026-11-05 | Vessel Collision | Vessel Collision | vessel collision | Feeder vessel struck the quay while berthing near [MASKED] | False | False | False | True |
 | CLM-3075982 | 2026-11-05 | Third-Party PD | Third-Party PD | third-party property damage | Insured truck scraped a third party's gate while turning in Lyon. Contact [MASKED] on [MASKED] or [MASKED] | False | False | True | True |
-| CLM-3076011 | 2026-11-05 | Third-Party PD | Third-Party PD | third-party property damage | Insured truck scraped a third party's gate while turning in [MASKED] | False | False | False | True |
 
 _30 more rows in the CSV._
 
@@ -347,34 +406,33 @@ _30 more rows in the CSV._
 
 | evaluated_at | check_name | genai_function | claims_checked | seeded_defects | flagged | true_positives | false_positives | false_negatives | precision | recall | f1 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-11-16T05:20:36.222Z | peril_mismatch | ai_classify | 1981 | 21 | 23 | 21 | 2 | 0 | 0.913 | 1.0 | 0.955 |
-| 2026-11-16T05:20:36.222Z | pii_in_free_text | ai_mask | 1981 | 70 | 86 | 70 | 16 | 0 | 0.814 | 1.0 | 0.897 |
+| 2026-11-16T06:08:02.176Z | peril_mismatch | ai_classify | 1981 | 21 | 22 | 21 | 1 | 0 | 0.955 | 1.0 | 0.977 |
+| 2026-11-16T06:08:02.176Z | pii_in_free_text | ai_mask | 1981 | 70 | 89 | 70 | 19 | 0 | 0.787 | 1.0 | 0.881 |
 
 **Cell** `display(spark.sql("""`
 
 | kind | claim_id | coded_cause | ai_peril | loss_description_masked |
 |---|---|---|---|---|
-| peril false alarm | CLM-3076076 | Theft | cargo theft | Thieves cut the fence at the Antwerp yard and removed copper cable |
-| peril false alarm | CLM-3076151 | Theft | cargo theft | Thieves cut the fence at the Rotterdam yard and removed copper cable |
+| peril false alarm | CLM-3076403 | Theft | cargo theft | Thieves cut the fence at the Rotterdam yard and removed copper cable |
 
 **Cell** `judged = spark.sql(f"""`
 
 | check_name | judged | correct_check | actionable | no_personal_data | faithful | avg_score |
 |---|---|---|---|---|---|---|
-| negative_amount | 2 | 1.0 | 1.0 | 1.0 | 0.5 | 3.0 |
-| non_eur_currency | 4 | 1.0 | 1.0 | 1.0 | 0.25 | 2.5 |
-| peril_mismatch | 6 | 1.0 | 1.0 | 1.0 | 1.0 | 4.8 |
-| pii_in_free_text | 28 | 0.857 | 1.0 | 1.0 | 0.893 | 3.46 |
-|  | 40 | 0.897 | 1.0 | 1.0 | 0.821 | 3.51 |
+| negative_amount | 2 | 1.0 | 1.0 | 1.0 | 0.0 | 3.0 |
+| non_eur_currency | 4 | 1.0 | 1.0 | 1.0 | 0.0 | 2.5 |
+| peril_mismatch | 6 | 1.0 | 1.0 | 1.0 | 1.0 | 4.83 |
+| pii_in_free_text | 28 | 0.75 | 0.964 | 1.0 | 0.821 | 3.21 |
+|  | 40 | 0.825 | 0.975 | 1.0 | 0.725 | 3.38 |
 | check_name | score | reason | ai_explanation |
 |---|---|---|---|
-| negative_amount | 3 | Correctly flags the negative incurred amount and says to make it positive, but ignores that negatives can be legitimate reserve reductions or recoveries. | The issue is that the incurred amount is negative (-23704.0), which is inconsistent with a legitimate claim. The claims handler should update the incurred amount to a positive value, as claims amounts cannot be negative. |
-| pii_in_free_text | 2 | Explains a cause-code mismatch rather than the failed pii_in_free_text check; ignores masked contact details in the description. | The issue is that the coded cause of loss is "Cargo Damage" but the description suggests "water damage", indicating a potential inconsistency. The claims handler should update the coded cause of loss to "Water Damage" to |
-| pii_in_free_text | 3 | Names the PII check and says to mask or remove it, but is generic. It ignores that the text is already masked and doesn't say what to change. | The issue is that the description field contains free text that may potentially include personally identifiable information (PII), which is not allowed. The claims handler should mask or remove any sensitive information  |
-| pii_in_free_text | 3 | Addresses PII in free text and says to re-mask or remove it, but it is generic and ignores that the description is already masked. | The issue is that the description field contains free text that may potentially include personally identifiable information (PII), which is not allowed. The claims handler should re-mask or remove any sensitive informati |
-| non_eur_currency | 2 | Names the non-EUR check, but Zurich is in Switzerland (CHF), so 'match location' is wrong; the amount and currency are not in the inputs. | The issue is that the incurred amount (41,225.0) is not in Euros, despite the location being Zurich, which suggests a European currency. The claims handler should update the currency of the incurred amount to Euros (EUR) |
-| pii_in_free_text | 2 | Blames the city Stuttgart as PII, ignoring the masked personal identifier; advice is misdirected and the claim is speculative. | The issue is that the description field contains location-specific information (Stuttgart) which may be considered personal or sensitive data. The claims handler should remove or mask the location (Stuttgart) from the de |
-| pii_in_free_text | 3 | Names the PII check and says to mask or remove it, but is generic and does not say what was flagged. | The issue is that the description field contains free text that may potentially include personally identifiable information (PII), which is not allowed. The claims handler should mask or remove any sensitive information  |
-| negative_amount | 3 | Explains negative_amount and gives a fix, but the -23951.0 value and 'incurred' field are not in the inputs, and it overlooks legitimate negatives such as recoveries. | The issue is that the incurred amount is negative (-23951.0), which is inconsistent with a valid claim. The claims handler should update the incurred amount to a positive value, as claims amounts cannot be negative. |
-| pii_in_free_text | 2 | Flags 'Vienna' as PII and ignores the masked contact details, which are the real PII; the fix is misdirected. | The issue is that the description contains location information ("Vienna") which may be considered personal identifiable information (PII). The claims handler should remove or mask the location to fix the issue and ensur |
-| non_eur_currency | 2 | Addresses the currency check, but the amount 7450.0 is not in the inputs, and the fix is vague (convert or relabel?). | The issue is that the incurred amount of 7450.0 is not in Euros, as required. The claims handler should update the incurred amount to the correct currency, presumably Euros, to resolve the non_eur_currency check failure. |
+| negative_amount | 3 | Addresses negative_amount and gives a fix, but the figure -23704.0 and the 'incurred' field are not in the inputs; the advice ignores valid negatives such as recoveries. | The issue is that the incurred amount is negative (-23704.0), which is inconsistent with a valid claims payment. The claims handler should update the incurred amount to a positive value, as claims payments cannot be nega |
+| pii_in_free_text | 3 | Identifies the PII-in-free-text issue and advises masking or removal, but it is generic and does not reference the specific [MASKED] token or description. | The issue is that the description field contains free text that may potentially include personally identifiable information (PII), which is masked but still poses a risk. The claims handler should ensure that all PII is  |
+| pii_in_free_text | 2 | Explains a cause-of-loss mismatch, not the failed pii_in_free_text check; ignores masked contact details in the description. | The issue is that the coded cause of loss is "Cargo Damage" but the description suggests "water damage", indicating a potential inconsistency. The claims handler should update the coded cause of loss to "Water Damage" to |
+| pii_in_free_text | 3 | Names the PII check and says to re-mask or remove, but is generic and doesn't point to what is exposed in the already-masked text. | The issue is that the description contains personal data, which is not allowed. The claims handler should re-mask or remove the personal data from the description to fix the issue. |
+| pii_in_free_text | 1 | Explains a cause mismatch, not the failed pii_in_free_text check; never mentions masked contact details in the description. | The issue is that the coded cause of loss is "Cargo Damage" but the description suggests "water damage", indicating a potential inconsistency. The claims handler should update the coded cause of loss to "Water Damage" to |
+| pii_in_free_text | 2 | Blames the generic 'Vienna premises' location; the masked token suggests a name was the PII. Advice is actionable but the cause is speculative. | The issue is that the description contains a location ("Vienna premises") which may be considered personal or sensitive information. The claims handler should mask or remove the location from the description to protect s |
+| negative_amount | 3 | Identifies the negative amount and says to fix it, but the figure -23951.0 and the 'incurred' field are not in the inputs, and it wrongly says negatives are never valid. | The issue is that the incurred amount is negative (-23951.0), which is inconsistent with a valid claim. The claims handler should update the incurred amount to a positive value, as claims amounts cannot be negative. |
+| pii_in_free_text | 2 | Flags the city Stuttgart as PII, ignoring the masked personal identifier that likely triggered the check; the advice is misdirected and the premise unsupported. | The issue is that the description field contains location-specific information (Stuttgart) which may be considered personal or sensitive data. The claims handler should remove or mask the location (Stuttgart) from the de |
+| non_eur_currency | 3 | Correctly identifies the non-EUR currency issue and suggests converting, but the amount 2133.0 is not in the provided inputs, so it is invented. | The issue is that the incurred amount of 2133.0 is not in Euros, as required. The claims handler should update the incurred amount to the equivalent value in Euros to resolve the non_EUR_currency check failure. |
+| non_eur_currency | 3 | Identifies the non-EUR currency issue and says to convert, but claims 'incurred amount' specifically, which the inputs don't state, and gives no conversion detail. | The issue is that the incurred amount is in a non-EUR currency, which is inconsistent with the expected currency. The claims handler should update the incurred amount to reflect the correct EUR currency value. |

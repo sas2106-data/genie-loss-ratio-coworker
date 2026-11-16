@@ -8,6 +8,7 @@ Functions from [`src/governance/05_row_filter_column_mask.py`](../../src/governa
 | table_name | filter_name | target_columns |
 |---|---|---|
 | silver_claims | <catalog>.loss_ratio_coworker.lrc_region_filter | region |
+| gold_daily_loss_run | <catalog>.loss_ratio_coworker.lrc_region_filter | region |
 
 
 ## Column masks attached (information_schema)

@@ -1,110 +1,107 @@
-Lakeflow pipeline update 9f45d277-7d53-4702-a081-cb8ea299bcf9: 108 events from event_log()
+Lakeflow pipeline update e1526545-97ad-49fc-bfa9-21c438ca4fa0: 105 events from event_log()
 
-2026-11-16T05:14:24.992Z  user_action          INFO   Principal '<user>' started an update.
-2026-11-16T05:14:25.002Z  create_update        INFO   Update 9f45d2 started by JOB_TASK.
-2026-11-16T05:14:27.317Z  update_progress      INFO   Update 9f45d2 is WAITING_FOR_RESOURCES.
-2026-11-16T05:14:30.809Z  runtime_details      INFO   Resolved runtime environment details for update 9f45d2.
-2026-11-16T05:14:37.059Z  update_progress      INFO   Update 9f45d2 is INITIALIZING.
-2026-11-16T05:14:38.366Z  user_code_context    INFO   User code context captured for this update.
-2026-11-16T05:14:49.061Z  update_progress      INFO   Update 9f45d2 is SETTING_UP_TABLES.
-2026-11-16T05:14:49.272Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`gold_daily_loss_run_lf` is active in the pipeline.
-2026-11-16T05:14:49.274Z  dataset_life_cycle   METRICS Streaming Table `<catalog>`.`loss_ratio_coworker`.`bronze_fnol` is active in the pipeline.
-2026-11-16T05:14:49.274Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`silver_claims_ai_checked` is active in the pipeline.
-2026-11-16T05:14:49.274Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`silver_premium` is active in the pipeline.
-2026-11-16T05:14:49.274Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`dq_claims_issues` is active in the pipeline.
-2026-11-16T05:14:49.274Z  dataset_life_cycle   METRICS Streaming Table `<catalog>`.`loss_ratio_coworker`.`bronze_premium` is active in the pipeline.
-2026-11-16T05:14:49.275Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`silver_claims` is active in the pipeline.
-2026-11-16T05:14:49.275Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`gold_rate_adequacy` is active in the pipeline.
-2026-11-16T05:14:49.275Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`dq_daily_scorecard` is active in the pipeline.
-2026-11-16T05:14:50.976Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`bronze_fnol` defined as APPEND.
-2026-11-16T05:14:51.027Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`silver_claims` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.038Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`bronze_premium` defined as APPEND.
-2026-11-16T05:14:51.043Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`silver_premium` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.048Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`gold_daily_loss_run_lf` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.052Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`silver_claims_ai_checked` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.062Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`gold_rate_adequacy` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.071Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`dq_claims_issues` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.078Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`dq_daily_scorecard` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.111Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`gold_daily_loss_run_lf` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.134Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`silver_claims_ai_checked` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.146Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`bronze_fnol` defined as STREAMING_TABLE.
-2026-11-16T05:14:51.158Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`bronze_premium` defined as STREAMING_TABLE.
-2026-11-16T05:14:51.168Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`gold_rate_adequacy` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.182Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`dq_claims_issues` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.193Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`silver_claims` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.217Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`silver_premium` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.228Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`dq_daily_scorecard` defined as MATERIALIZED_VIEW.
-2026-11-16T05:14:51.286Z  graph_created        INFO   Dataflow graph successfully loaded.
-2026-11-16T05:14:51.296Z  update_progress      INFO   Update 9f45d2 is RUNNING.
-2026-11-16T05:14:51.314Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is QUEUED.
-2026-11-16T05:14:51.320Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' is QUEUED.
-2026-11-16T05:14:51.322Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is QUEUED.
-2026-11-16T05:14:51.324Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is QUEUED.
-2026-11-16T05:14:51.326Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is QUEUED.
-2026-11-16T05:14:51.328Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is QUEUED.
-2026-11-16T05:14:51.329Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' is QUEUED.
-2026-11-16T05:14:51.331Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is QUEUED.
-2026-11-16T05:14:51.334Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is QUEUED.
-2026-11-16T05:14:51.547Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' is STARTING.
-2026-11-16T05:14:56.822Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' is RUNNING.
-2026-11-16T05:14:57.411Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' is STARTING.
-2026-11-16T05:14:57.800Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' is RUNNING.
-2026-11-16T05:15:02.209Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' has COMPLETED.
-2026-11-16T05:15:02.343Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' has COMPLETED.
-2026-11-16T05:15:02.401Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is PLANNING.
-2026-11-16T05:15:02.404Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is PLANNING.
-2026-11-16T05:15:04.443Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' has been planned to be executed as COMPLETE_RECOMPUTE.
-2026-11-16T05:15:04.476Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is STARTING.
-2026-11-16T05:15:04.601Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is RUNNING.
-2026-11-16T05:15:04.897Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' has been planned to be executed as NO_OP.
-2026-11-16T05:15:04.909Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is STARTING.
-2026-11-16T05:15:04.919Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is RUNNING.
-2026-11-16T05:15:04.937Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_silver_premium_1` finished with executor time 0 ms and executor CPU time 0 ms.
-2026-11-16T05:15:06.586Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_silver_claims_1` finished with executor time 676 ms and executor CPU time 403 ms.
-2026-11-16T05:15:07.626Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' has COMPLETED.
-2026-11-16T05:15:09.449Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' has COMPLETED.
-2026-11-16T05:15:09.464Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is PLANNING.
-2026-11-16T05:15:09.466Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is PLANNING.
-2026-11-16T05:15:10.304Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' has been planned to be executed as COMPLETE_RECOMPUTE.
-2026-11-16T05:15:10.319Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is STARTING.
-2026-11-16T05:15:10.482Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is RUNNING.
-2026-11-16T05:15:11.057Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' has been planned to be executed as COMPLETE_RECOMPUTE.
-2026-11-16T05:15:11.065Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is STARTING.
-2026-11-16T05:15:11.129Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is RUNNING.
-2026-11-16T05:15:12.122Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_gold_daily_loss_run_lf_1` finished with executor time 511 ms and executor CPU time 285 ms.
-2026-11-16T05:15:13.962Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' has COMPLETED.
-2026-11-16T05:15:14.091Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is PLANNING.
-2026-11-16T05:15:14.997Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' has been planned to be executed as COMPLETE_RECOMPUTE.
-2026-11-16T05:15:15.027Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is STARTING.
-2026-11-16T05:15:15.087Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is RUNNING.
-2026-11-16T05:15:16.741Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_gold_rate_adequacy_1` finished with executor time 843 ms and executor CPU time 397 ms.
-2026-11-16T05:15:19.005Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' has COMPLETED.
-2026-11-16T05:15:37.175Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.gold_rate_adequacy'.
-2026-11-16T05:15:37.190Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.silver_claims_ai_checked'.
-2026-11-16T05:15:37.193Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf'.
-2026-11-16T05:15:37.196Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.silver_claims'.
-2026-11-16T05:15:37.198Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
-2026-11-16T05:16:37.173Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
-2026-11-16T05:17:37.173Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
-2026-11-16T05:18:37.173Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
-2026-11-16T05:19:24.566Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_silver_claims_ai_checked_1` finished with executor time 250180 ms and executor CPU time 4202 ms.
-2026-11-16T05:19:25.492Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' has COMPLETED.
-2026-11-16T05:19:25.498Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is PLANNING.
-2026-11-16T05:19:27.573Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' has been planned to be executed as COMPLETE_RECOMPUTE.
-2026-11-16T05:19:27.582Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is STARTING.
-2026-11-16T05:19:27.663Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is RUNNING.
-2026-11-16T05:19:37.173Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.dq_claims_issues'.
-2026-11-16T05:19:37.176Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.silver_claims_ai_checked'.
-2026-11-16T05:19:37.178Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
-2026-11-16T05:19:54.560Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_dq_claims_issues_1` finished with executor time 55018 ms and executor CPU time 716 ms.
-2026-11-16T05:19:56.070Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' has COMPLETED.
-2026-11-16T05:19:56.075Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is PLANNING.
-2026-11-16T05:19:58.701Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' has been planned to be executed as COMPLETE_RECOMPUTE.
-2026-11-16T05:19:58.705Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is STARTING.
-2026-11-16T05:19:58.744Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is RUNNING.
-2026-11-16T05:20:00.835Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_dq_daily_scorecard_1` finished with executor time 535 ms and executor CPU time 322 ms.
-2026-11-16T05:20:02.558Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' has COMPLETED.
-2026-11-16T05:20:02.588Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.dq_claims_issues'.
-2026-11-16T05:20:02.590Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.dq_daily_scorecard'.
-2026-11-16T05:20:02.592Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
-2026-11-16T05:20:02.595Z  update_progress      INFO   Update 9f45d2 is COMPLETED.
+2026-11-16T06:02:29.555Z  user_action          INFO   Principal '<user>' started an update.
+2026-11-16T06:02:29.570Z  create_update        INFO   Update e15265 started by JOB_TASK.
+2026-11-16T06:02:40.471Z  update_progress      INFO   Update e15265 is WAITING_FOR_RESOURCES.
+2026-11-16T06:02:46.093Z  runtime_details      INFO   Resolved runtime environment details for update e15265.
+2026-11-16T06:02:52.364Z  update_progress      INFO   Update e15265 is INITIALIZING.
+2026-11-16T06:02:53.719Z  user_code_context    INFO   User code context captured for this update.
+2026-11-16T06:03:04.106Z  update_progress      INFO   Update e15265 is SETTING_UP_TABLES.
+2026-11-16T06:03:04.303Z  dataset_life_cycle   METRICS Streaming Table `<catalog>`.`loss_ratio_coworker`.`bronze_fnol` is active in the pipeline.
+2026-11-16T06:03:04.304Z  dataset_life_cycle   METRICS Streaming Table `<catalog>`.`loss_ratio_coworker`.`bronze_premium` is active in the pipeline.
+2026-11-16T06:03:04.304Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`gold_rate_adequacy` is active in the pipeline.
+2026-11-16T06:03:04.305Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`silver_premium` is active in the pipeline.
+2026-11-16T06:03:04.305Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`dq_daily_scorecard` is active in the pipeline.
+2026-11-16T06:03:04.305Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`dq_claims_issues` is active in the pipeline.
+2026-11-16T06:03:04.305Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`silver_claims_ai_checked` is active in the pipeline.
+2026-11-16T06:03:04.305Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`silver_claims` is active in the pipeline.
+2026-11-16T06:03:04.305Z  dataset_life_cycle   METRICS Materialized View `<catalog>`.`loss_ratio_coworker`.`gold_daily_loss_run_lf` is active in the pipeline.
+2026-11-16T06:03:07.045Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`bronze_premium` defined as APPEND.
+2026-11-16T06:03:07.082Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`bronze_fnol` defined as APPEND.
+2026-11-16T06:03:07.087Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`silver_premium` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.097Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`silver_claims` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.104Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`silver_claims_ai_checked` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.108Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`gold_daily_loss_run_lf` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.118Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`gold_rate_adequacy` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.126Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`dq_claims_issues` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.130Z  flow_definition      INFO   Flow `<catalog>`.`loss_ratio_coworker`.`dq_daily_scorecard` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.153Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`gold_daily_loss_run_lf` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.177Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`silver_claims_ai_checked` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.187Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`bronze_fnol` defined as STREAMING_TABLE.
+2026-11-16T06:03:07.197Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`bronze_premium` defined as STREAMING_TABLE.
+2026-11-16T06:03:07.207Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`gold_rate_adequacy` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.216Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`dq_claims_issues` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.225Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`silver_claims` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.249Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`silver_premium` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.260Z  dataset_definition   INFO   Dataset `<catalog>`.`loss_ratio_coworker`.`dq_daily_scorecard` defined as MATERIALIZED_VIEW.
+2026-11-16T06:03:07.319Z  graph_created        INFO   Dataflow graph successfully loaded.
+2026-11-16T06:03:07.328Z  update_progress      INFO   Update e15265 is RUNNING.
+2026-11-16T06:03:07.340Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' is QUEUED.
+2026-11-16T06:03:07.348Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is QUEUED.
+2026-11-16T06:03:07.350Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is QUEUED.
+2026-11-16T06:03:07.352Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is QUEUED.
+2026-11-16T06:03:07.353Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' is QUEUED.
+2026-11-16T06:03:07.355Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is QUEUED.
+2026-11-16T06:03:07.356Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is QUEUED.
+2026-11-16T06:03:07.358Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is QUEUED.
+2026-11-16T06:03:07.359Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is QUEUED.
+2026-11-16T06:03:07.539Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' is STARTING.
+2026-11-16T06:03:12.887Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' is RUNNING.
+2026-11-16T06:03:13.467Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' is STARTING.
+2026-11-16T06:03:13.922Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' is RUNNING.
+2026-11-16T06:03:17.880Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_premium' has COMPLETED.
+2026-11-16T06:03:17.995Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.bronze_fnol' has COMPLETED.
+2026-11-16T06:03:18.002Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is PLANNING.
+2026-11-16T06:03:20.382Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' has been planned to be executed as NO_OP.
+2026-11-16T06:03:20.413Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is STARTING.
+2026-11-16T06:03:20.430Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' is RUNNING.
+2026-11-16T06:03:20.445Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_silver_premium_1` finished with executor time 0 ms and executor CPU time 0 ms.
+2026-11-16T06:03:21.961Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is PLANNING.
+2026-11-16T06:03:22.763Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_premium' has COMPLETED.
+2026-11-16T06:03:23.299Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' has been planned to be executed as COMPLETE_RECOMPUTE.
+2026-11-16T06:03:23.319Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is STARTING.
+2026-11-16T06:03:23.476Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' is RUNNING.
+2026-11-16T06:03:25.942Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_silver_claims_1` finished with executor time 701 ms and executor CPU time 390 ms.
+2026-11-16T06:03:28.595Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims' has COMPLETED.
+2026-11-16T06:03:28.601Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is PLANNING.
+2026-11-16T06:03:28.603Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is PLANNING.
+2026-11-16T06:03:29.294Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' has been planned to be executed as COMPLETE_RECOMPUTE.
+2026-11-16T06:03:29.312Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is STARTING.
+2026-11-16T06:03:29.407Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' has been planned to be executed as COMPLETE_RECOMPUTE.
+2026-11-16T06:03:29.411Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is STARTING.
+2026-11-16T06:03:29.463Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' is RUNNING.
+2026-11-16T06:03:29.470Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' is RUNNING.
+2026-11-16T06:03:31.017Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_gold_daily_loss_run_lf_1` finished with executor time 520 ms and executor CPU time 284 ms.
+2026-11-16T06:03:32.155Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf' has COMPLETED.
+2026-11-16T06:03:32.430Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is PLANNING.
+2026-11-16T06:03:33.386Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' has been planned to be executed as COMPLETE_RECOMPUTE.
+2026-11-16T06:03:33.413Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is STARTING.
+2026-11-16T06:03:33.469Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' is RUNNING.
+2026-11-16T06:03:35.092Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_gold_rate_adequacy_1` finished with executor time 829 ms and executor CPU time 388 ms.
+2026-11-16T06:03:37.166Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.gold_rate_adequacy' has COMPLETED.
+2026-11-16T06:03:52.480Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.gold_daily_loss_run_lf'.
+2026-11-16T06:03:52.484Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
+2026-11-16T06:03:52.489Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.gold_rate_adequacy'.
+2026-11-16T06:03:52.492Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.silver_claims'.
+2026-11-16T06:04:52.462Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
+2026-11-16T06:05:52.462Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
+2026-11-16T06:06:45.728Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_silver_claims_ai_checked_1` finished with executor time 194289 ms and executor CPU time 3716 ms.
+2026-11-16T06:06:46.796Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.silver_claims_ai_checked' has COMPLETED.
+2026-11-16T06:06:46.802Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is PLANNING.
+2026-11-16T06:06:52.462Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.silver_claims_ai_checked'.
+2026-11-16T06:06:52.465Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
+2026-11-16T06:07:04.576Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' has been planned to be executed as ROW_BASED.
+2026-11-16T06:07:04.589Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is STARTING.
+2026-11-16T06:07:04.606Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' is RUNNING.
+2026-11-16T06:07:11.246Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_dq_claims_issues_1` finished with executor time 15929 ms and executor CPU time 799 ms.
+2026-11-16T06:07:13.745Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_claims_issues' has COMPLETED.
+2026-11-16T06:07:13.751Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is PLANNING.
+2026-11-16T06:07:18.407Z  planning_information INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' has been planned to be executed as COMPLETE_RECOMPUTE. Another option is available:ROW_BASED. COMPLETE_RECOMPUTE was chosen in the current run for its optimal performance.
+2026-11-16T06:07:18.418Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is STARTING.
+2026-11-16T06:07:18.476Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' is RUNNING.
+2026-11-16T06:07:19.771Z  aggregated_flow_metrics METRICS `<catalog>`.`loss_ratio_coworker`.`__materialization_mat_6e420ed9_2d49_431b_b14e_b358b8d19ba9_dq_daily_scorecard_1` finished with executor time 416 ms and executor CPU time 226 ms.
+2026-11-16T06:07:21.081Z  flow_progress        INFO   Flow '<catalog>.loss_ratio_coworker.dq_daily_scorecard' has COMPLETED.
+2026-11-16T06:07:21.109Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.dq_daily_scorecard'.
+2026-11-16T06:07:21.111Z  flow_progress        METRICS Reported flow time metrics for flowName: '<catalog>.loss_ratio_coworker.dq_claims_issues'.
+2026-11-16T06:07:21.114Z  flow_progress        METRICS Reported flow time metrics for flowName: 'pipelines.flowTimeMetrics.missingFlowName'.
+2026-11-16T06:07:21.117Z  update_progress      INFO   Update e15265 is COMPLETED.

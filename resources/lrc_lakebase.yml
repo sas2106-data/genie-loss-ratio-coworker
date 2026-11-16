@@ -1,5 +1,0 @@
-resources:
-  database_instances:
-    lrc_lakebase:
-      name: ${var.lakebase_instance}
-      capacity: CU_1

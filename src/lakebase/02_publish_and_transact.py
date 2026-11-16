@@ -4,8 +4,7 @@
 # MAGIC
 # MAGIC Runs every morning after the daily watch:
 # MAGIC
-# MAGIC 1. **Publish actions** from Delta `lr_action_recommendations` into Lakebase `ops.lr_actions`.
-# MAGIC    `INSERT … ON CONFLICT DO NOTHING`, so a team's status, owner and notes are never overwritten by a re-run.
+# MAGIC 1. **Actions** are published to Lakebase `ops.lr_actions` by the daily watch (step 4b); this notebook checks them.
 # MAGIC 2. **Pricing transactions**: today's quotes from the pricing desk (simulated), with a **referral** when the
 # MAGIC    segment is RED, and one **PROPOSED rate action** per Pricing action from the coworker (idempotent on
 # MAGIC    `source_action_id`). All in a single Postgres transaction.
@@ -66,15 +65,9 @@ rng = np.random.default_rng(int(datetime.now().strftime("%Y%m%d")))
 
 with connect(inst, DB) as c:
     with c.transaction():
-        # 1 · actions (keep team updates on conflict)
-        pub = 0
-        for r in actions.itertuples():
-            cur = c.execute("""INSERT INTO ops.lr_actions (action_id, alert_id, as_of_date, line_of_business, region, alert_status,
-                                 primary_driver, team, priority, action, due_within)
-                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (action_id) DO NOTHING""",
-                            (f"{r.alert_id}:{r.team}", r.alert_id, r.as_of_date, r.line_of_business, r.region, r.alert_status,
-                             r.primary_driver, r.team, r.priority, r.action, r.due_within))
-            pub += cur.rowcount
+        # 1 · actions are published by the daily watch itself (src/jobs/daily_loss_ratio_watch.py, step 4b)
+        pub = c.execute("SELECT count(*) FROM ops.lr_actions WHERE as_of_date = %s",
+                        (actions.as_of_date.max() if len(actions) else None,)).fetchone()[0]
         # 2a · today's quotes from the pricing desk; RED segments are referred to a senior underwriter
         day = datetime.now(timezone.utc).strftime("%Y%m%d")
         if not c.execute("SELECT 1 FROM pricing.quotes WHERE quote_id LIKE %s LIMIT 1", (f"Q-{day}-%",)).fetchone():
@@ -101,7 +94,7 @@ with connect(inst, DB) as c:
                              RATE_BY_DRIVER.get(str(r.primary_driver).lower(), 3.0),
                              f"{r.alert_status} on loss ratio, driver {r.primary_driver}: {r.action}", "loss-ratio-coworker"))
             props += cur.rowcount
-    print(f"published {pub} new actions · proposed {props} rate actions")
+    print(f"{pub} actions for today already in Lakebase (published by the daily watch) · proposed {props} rate actions")
     for t in ["ops.lr_actions", "pricing.quotes", "pricing.rate_actions"]:
         print(t, c.execute(f"SELECT count(*) FROM {t}").fetchone()[0])
 
