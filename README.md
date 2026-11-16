@@ -64,7 +64,7 @@ Lakeflow Job run 945039689803583  result=SUCCESS  start=2026-11-16 05:50:41 UTC 
 | Rule-based findings | 19 (negative amounts, loss after report, non-EUR currency) |
 | Reconciliation | Lakeflow gold incurred differs from original gold by **-2.99%** over 2026-10-18 → 2026-11-16 |
 | Rate adequacy | 6 segment(s) where the achieved rate change is below the indicated rate change |
-| Genie Agent benchmark | 10/10 questions answered correctly from the governed tables ([06_genie_agent.md](06_genie_agent.md)) |
+| Genie Agent benchmark | 10/10 questions answered correctly from the governed tables ([06_genie_agent.md](docs/run_evidence/06_genie_agent.md)) |
 | Lakebase actions | 16 actions in `ops.lr_actions` with team status |
 | LLM judge of explanations | 40 explanations judged · avg score 3.38/5 · correct check 0.83 · no personal data 1.0 |
 | Unity Catalog policies | 2 row filter(s) and 1 column mask(s) attached in Unity Catalog |

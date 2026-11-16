@@ -617,7 +617,7 @@ Lakeflow Job `lrc_end_to_end`, run `{run['run_id']}`: **{ok}/{len(run['tasks'])}
 
 | Result | Value |
 |---|---|
-""" + "\n".join(f"| {k} | {v} |" for k, v in heads.get("rows", [])) + f"""
+""" + "\n".join(f"| {k} | {re.sub(r'\]\((?!http|docs/)([^)]+)\)', r'](docs/run_evidence/\1)', v)} |" for k, v in heads.get("rows", [])) + f"""
 
 Key lines of the implementation, extracted from the committed source files:
 
