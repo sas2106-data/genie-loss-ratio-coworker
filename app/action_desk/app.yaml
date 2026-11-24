@@ -1,0 +1,6 @@
+command: ["streamlit", "run", "app.py", "--server.headless", "true"]
+env:
+  - name: LAKEBASE_INSTANCE
+    value: lrc-lakebase
+  - name: LRC_SCHEMA
+    value: loss_ratio_coworker
