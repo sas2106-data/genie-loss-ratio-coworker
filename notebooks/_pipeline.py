@@ -14,7 +14,8 @@ w = WorkspaceClient()
 LAYERS = {"bronze": "01_bronze.sql", "silver": "02_silver.sql", "gold": "03_gold.sql"}
 
 
-def run_pipeline(layers):
+def run_pipeline(layers, refresh=None):
+    """Add the layers' SQL files to the pipeline and run an update; refresh = only these tables (others are left as they are)."""
     spec = {
         "name": f"[LRC] Loss ratio pipeline · {CATALOG}.{SCHEMA}",
         "catalog": CATALOG, "schema": SCHEMA, "serverless": True, "photon": True, "channel": "CURRENT",
@@ -33,7 +34,8 @@ def run_pipeline(layers):
         save_setting("pipeline_id", pid)
     print(f"pipeline {pid} with source code: {', '.join(LAYERS[l] for l in layers)}")
     print(f"watch it run: {w.config.host}/pipelines/{pid}")
-    update_id = w.api_client.do("POST", f"/api/2.0/pipelines/{pid}/updates", body={"full_refresh": FULL_REFRESH})["update_id"]
+    body = {"refresh_selection": refresh} if refresh else {"full_refresh": FULL_REFRESH and layers == ["bronze"]}
+    update_id = w.api_client.do("POST", f"/api/2.0/pipelines/{pid}/updates", body=body)["update_id"]
     state = ""
     for _ in range(160):
         state = w.api_client.do("GET", f"/api/2.0/pipelines/{pid}/updates/{update_id}")["update"]["state"]

@@ -11,8 +11,9 @@
 # MAGIC | `claims_fnol/<YYYY-MM>/` and `claims_fnol/<YYYY-MM-DD>/` | JSON lines | first notice of loss: claim, amounts, status and a free-text description |
 # MAGIC | `premium_bordereaux/<YYYY-MM>/` and `premium_bordereaux/<YYYY-MM-DD>/` | CSV | earned premium per line of business, region and day |
 # MAGIC
-# MAGIC History is landed as one file per month, and the last 30 days as daily drops, so the pipeline sees both a backfill and
-# MAGIC a daily feed. Three **planted events** give the coworker something real to find:
+# MAGIC Only this year's claims and premium are landed (from 1 January, or the last 180 days if that is longer), which keeps the
+# MAGIC tutorial small (about 38,000 claims) while the year-to-date and 90-day baselines stay complete. History is landed as one
+# MAGIC file per month, and the last 30 days as daily drops, so the pipeline sees both a backfill and a daily feed. Three **planted events** give the coworker something real to find:
 # MAGIC 1. **Hailstorm, DACH Property** (loss dates in the last 6 days): a burst of high-severity claims.
 # MAGIC 2. **Frequency creep, UK & Ireland Motor** (last 21 days): about 45% more collisions at normal severity.
 # MAGIC 3. **Large bodily-injury loss, Southern Europe Liability** (reported 3 days ago): one EUR 2.4m claim.
@@ -247,6 +248,13 @@ random.seed(7)
 rng_files = np.random.default_rng(7)
 for folder in ["claims_fnol", "premium_bordereaux"]:
     dbutils.fs.rm(f"{RAW}/{folder}", True)            # a clean landing zone on every run
+
+# land this year only: the book above is calibrated on the full history, so recent loss ratios are unchanged
+from datetime import date
+land_from = min(date(date.today().year, 1, 1), date.today() - timedelta(days=180))
+claims = claims[claims.report_date >= land_from].reset_index(drop=True)
+earned_premium_daily = earned_premium_daily[earned_premium_daily.as_of_date >= land_from].reset_index(drop=True)
+print(f"Landing claims and premium from {land_from}: {len(claims):,} claims, {len(earned_premium_daily):,} premium rows")
 
 last = max(claims.report_date.max(), earned_premium_daily.as_of_date.max())
 daily_from = last - timedelta(days=DAILY_DROP_DAYS - 1)

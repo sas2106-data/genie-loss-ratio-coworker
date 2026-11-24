@@ -25,7 +25,7 @@ WAREHOUSE_ID = ""                         # blank = first serverless SQL warehou
 LLM_ENDPOINT = "databricks-meta-llama-3-3-70b-instruct"
 MAX_AI_CLAIMS = 2000                      # Gen AI checks run on at most this many of the newest claims
 AI_LOOKBACK_DAYS = 14                     # ... reported in the last N days
-FULL_REFRESH = False                      # True after re-running step 01
+FULL_REFRESH = False                      # True after re-running step 01 (used by step 02)
 
 DAILY_DROP_DAYS = 30                      # step 01 lands the last 30 days as daily files, older history as monthly files
 FILES_PER_DAY = 2
@@ -33,7 +33,7 @@ FILES_PER_DAY = 2
 LAKEBASE_INSTANCE = "lrc-lakebase"
 LAKEBASE_DATABASE = "lrc_ops"
 APP_NAME = "lrc-action-desk"
-JUDGE_ENDPOINT = "databricks-claude-sonnet-5-5"
+JUDGE_ENDPOINT = "databricks-gpt-oss-120b"      # optional notebooks: a different model family from LLM_ENDPOINT
 
 # COMMAND ----------
 

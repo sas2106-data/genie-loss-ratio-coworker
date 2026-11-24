@@ -71,7 +71,7 @@ The synthetic book has three planted events for the coworker to find:
 | Step | Notebook | What it does | Check before moving on |
 |---|---|---|---|
 | 0 | `00_setup` | Creates the catalog (if missing and allowed), the schema and the `raw` volume | It prints the target catalog, schema and volume |
-| 1 | `01_generate_synthetic_data` | Generates the synthetic book and lands it as files: monthly files for the history, daily drops for the last 30 days, with the three planted events and planted data-quality defects | It prints the records and files landed, the events and the defects |
+| 1 | `01_generate_synthetic_data` | Generates the synthetic book and lands this year of it as files (about 38,000 claims): monthly files, then daily drops for the last 30 days, with the three planted events and planted data-quality defects | It prints the records and files landed, the events and the defects |
 | 2 | `02_bronze` | Creates the Lakeflow pipeline with `pipeline/01_bronze.sql` and runs it: Auto Loader reads every file into `bronze_fnol` and `bronze_premium` | Records per table; open the pipeline graph from the printed link |
 | 3 | `03_silver_data_quality` | Creates the row filter and column mask, adds `pipeline/02_silver.sql` and runs it: Gen AI checks (`ai_classify`, `ai_mask`) on the ~2,000 newest claims become expectations next to the rules, and `ai_query` explains every issue | The Gen AI and rule expectations side by side, the claims Gen AI flagged with their explanation, the masked text |
 | 4 | `04_gold` | Adds `pipeline/03_gold.sql` and runs it: `gold_daily_loss_run`, one row per day, line of business and region | 7-day loss ratio by segment: Property DACH, Motor UK & Ireland and Liability Southern Europe at the top |
@@ -85,8 +85,7 @@ The synthetic book has three planted events for the coworker to find:
 | 12 | `12_snapshot_to_delta` | Copies actions, quotes and rate actions back to Delta, and builds `gold_rate_adequacy` (indicated vs achieved rate change) | Your app change appears in `lr_action_status` |
 | 13 | `13_refresh_genie_agent` | Re-runs step 06 so the agent also covers team status and rate adequacy | Ask *"Which actions are still open for Reinsurance?"* |
 
-If you re-run step 01, set `FULL_REFRESH = True` in `00_setup` for the next pipeline run (steps 02 to 04), then set it
-back to `False`.
+If you re-run step 01, set `FULL_REFRESH = True` in `00_setup` before step 02, so bronze re-reads the new files.
 
 ### Optional modules (not needed for the main flow)
 

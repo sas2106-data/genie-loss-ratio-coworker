@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # 04 · Pipeline, gold: the daily loss run
 # MAGIC
-# MAGIC Adds `pipeline/03_gold.sql` and runs the whole pipeline. `gold_daily_loss_run` has one row per day, line of business
+# MAGIC Adds `pipeline/03_gold.sql` and refreshes only the new gold table, so the Gen AI checks in silver don't run again. `gold_daily_loss_run` has one row per day, line of business
 # MAGIC and region: incurred loss on the date it was reported and the premium earned that day. It is the single table the
 # MAGIC metric views (step 05) build the governed loss ratio on.
 
@@ -16,7 +16,7 @@
 
 # COMMAND ----------
 
-run_pipeline(["bronze", "silver", "gold"])
+run_pipeline(["bronze", "silver", "gold"], refresh=["gold_daily_loss_run"])   # silver and its Gen AI checks are already up to date
 
 # COMMAND ----------
 
