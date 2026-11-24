@@ -1,15 +1,15 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Optional B · How good are the Gen AI data-quality checks? (precision, recall, LLM judge)
+# MAGIC # Optional · How good are the Gen AI data-quality checks? (precision, recall, LLM judge)
 # MAGIC
-# MAGIC **Optional: the main flow does not need it.** Run it any time after step 10.
+# MAGIC **Optional: the main flow does not need it.** Run it any time after step 03.
 # MAGIC
-# MAGIC The landing notebook (step 09) seeds known defects into the raw files, so every Gen AI
+# MAGIC Step 01 plants known defects into the raw files, so every Gen AI
 # MAGIC finding can be scored against ground truth:
 # MAGIC
 # MAGIC | Check (Lakeflow pipeline) | Gen AI function | Ground truth |
 # MAGIC |---|---|---|
-# MAGIC | `peril_mismatch` | `ai_classify` reads the free-text description and infers the peril | coded `cause_of_loss` in the file differs from the source system (`claims`) |
+# MAGIC | `peril_mismatch` | `ai_classify` reads the free-text description and infers the peril | coded `cause_of_loss` in the file differs from the source system (`truth_claims`, written by step 01) |
 # MAGIC | `pii_in_free_text` | `ai_mask` redacts names, phone numbers and emails | the description contains the seeded contact details |
 # MAGIC
 # MAGIC A second, independent model family then acts as an **LLM judge** of the `ai_query` explanations (step 4).
@@ -19,7 +19,7 @@
 
 # COMMAND ----------
 
-# MAGIC %run ../00_config
+# MAGIC %run ../00_setup
 
 # COMMAND ----------
 
@@ -40,7 +40,7 @@ SELECT a.claim_id, a.report_date, a.cause_of_loss AS coded_cause, c.cause_of_los
        s.loss_description RLIKE '@example\\\\.com|\\\\+44 7700'             AS truth_pii,
        a.pii_detected                                                       AS flag_pii
 FROM {FQ}.silver_claims_ai_checked a
-JOIN {FQ}.claims c USING (claim_id)
+JOIN {FQ}.truth_claims c USING (claim_id)
 JOIN {FQ}.silver_claims s USING (claim_id)
 """)
 display(spark.sql("SELECT * EXCEPT (loss_description) FROM genai_scored WHERE truth_peril_mismatch OR flag_peril_mismatch OR truth_pii OR flag_pii LIMIT 50"))

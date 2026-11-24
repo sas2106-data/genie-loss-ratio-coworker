@@ -1,13 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 12 · AI/BI dashboard: "Daily Loss Ratio Watch"
+# MAGIC # 07 · AI/BI dashboard: "Daily Loss Ratio Watch"
 # MAGIC
 # MAGIC Creates (or updates) and publishes an AI/BI dashboard on the same metric views and watchlist that Genie uses:
-# MAGIC year-to-date KPIs, the rolling 7-day loss ratio, today's watchlist and actions, and public benchmarks.
+# MAGIC year-to-date KPIs, the rolling 7-day loss ratio, today's watchlist and actions, data quality and public benchmarks.
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 
@@ -52,11 +52,11 @@ DATASETS = {
       FROM {fq('v_loss_ratio_watchlist')}
       ORDER BY CASE status WHEN 'RED' THEN 0 WHEN 'AMBER' THEN 1 ELSE 2 END, gap_7d_pts DESC""",
     "actions": f"""
-      SELECT a.priority, a.team, al.line_of_business, al.region, al.primary_driver, a.action, a.due_within, a.state
-      FROM {fq('lr_action_recommendations')} a JOIN {fq('lr_alerts')} al USING (alert_id)
-      WHERE al.as_of_date = (SELECT MAX(as_of_date) FROM {fq('lr_alerts')})
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY a.alert_id, a.team ORDER BY a.created_at DESC) = 1
-      ORDER BY a.priority, a.team""",
+      SELECT priority, team, line_of_business, region, primary_driver, action, due_within
+      FROM {fq('v_todays_actions')} ORDER BY priority, team""",
+    "dq": f"""
+      SELECT check_name, check_type, SUM(issues) AS claims_with_issue, ROUND(AVG(pass_rate), 4) AS avg_pass_rate
+      FROM {fq('dq_daily_scorecard')} GROUP BY ALL ORDER BY claims_with_issue DESC""",
     "benchmarks": f"""
       SELECT 'Our book (YTD, synthetic)' AS benchmark, MEASURE(combined_ratio) AS combined_ratio
       FROM {fq('mv_loss_ratio')} WHERE YEAR(as_of_date) = YEAR({TODAY})
@@ -126,7 +126,7 @@ def build() -> dict:
     layout = [
         text(["## Daily Loss Ratio Watch\n",
               "Synthetic European commercial P&C book · loss ratio = incurred / earned (governed metric view `mv_loss_ratio`) · "
-              "refreshed every morning · alerts and recommended actions go to Slack and Teams\n"], 0, 0, 6, 2),
+              "refreshed every morning · the Genie One brief sends the same numbers to Slack and email\n"], 0, 0, 6, 2),
         counter("kpi", "ytd_loss_ratio", "YTD loss ratio", 0, 2, pct=True),
         counter("kpi", "ytd_target", "YTD target", 1, 2, pct=True),
         counter("kpi", "ytd_combined_ratio", "YTD combined ratio", 2, 2, pct=True),
@@ -142,8 +142,10 @@ def build() -> dict:
         table("watchlist", ["status", "line_of_business", "region", "primary_driver", "lr_7d_pct", "lr_30d_pct",
                             "target_pct", "gap_7d_pts", "freq_change_pct", "sev_change_pct", "large_losses_7d",
                             "owner_team"], "Today's watchlist (RED / AMBER / GREEN)", 2, 11, 4, 6),
-        table("actions", ["priority", "team", "line_of_business", "region", "primary_driver", "action", "due_within",
-                          "state"], "Recommended actions for downstream teams (latest run)", 0, 17, 6, 6),
+        table("actions", ["priority", "team", "line_of_business", "region", "primary_driver", "action", "due_within"],
+              "Today's actions for downstream teams", 0, 17, 6, 6),
+        table("dq", ["check_name", "check_type", "claims_with_issue", "avg_pass_rate"],
+              "Data quality from the pipeline (rules and Gen AI)", 0, 23, 6, 5),
     ]
     return {
         "datasets": [{"name": k, "displayName": k.replace("_", " ").title(), "queryLines": [" ".join(v.split()) + " "]}

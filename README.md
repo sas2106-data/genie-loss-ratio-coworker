@@ -1,9 +1,9 @@
 # Genie Loss Ratio Coworker
 
 Manage an insurance loss ratio **daily, not monthly**, and learn how it is built on Databricks by running one notebook
-at a time: synthetic claims → Unity Catalog governance → one governed loss-ratio definition → Genie explains why it
-moved → actions in Lakebase → a Lakeflow pipeline with Gen AI data-quality checks → an ML forecast → a dashboard and an
-app. All data is synthetic.
+at a time, in the order the data flows: synthetic source files → a Lakeflow pipeline (bronze, silver with data
+quality, gold) → metric views → a Genie Agent and a dashboard → a Genie One morning brief → actions in Lakebase and a
+Databricks App. All data is synthetic.
 
 ## Use case
 
@@ -13,15 +13,17 @@ pack three to six weeks after the claims arrived.
 
 The coworker checks the book every morning instead:
 
-1. **Detect.** It finds the segments (line of business × region) whose 7-day or 30-day loss ratio has moved above
-   target, and marks them RED, AMBER or GREEN.
-2. **Explain.** It asks a Genie Agent *why*: claim frequency or severity, a catastrophe or a single large loss.
-3. **Act.** It assigns owned actions, with due dates, to Claims, Underwriting, Pricing, Reinsurance, Reserving and
-   Finance. Teams update them in an app on Lakebase, and Pricing approves or rejects the rate changes it proposes.
-4. **Trust the data.** On arrival, Gen AI checks flag claims whose cause-of-loss code contradicts the description,
-   and personal data typed into free text. Unity Catalog masks it and limits each claims team to its own region.
-5. **Look ahead.** A model forecasts next week's claim count and escalates segments where claims are rising and the
-   team's action is still open.
+1. **Trust the data.** Claim and premium files land in a raw volume. A Lakeflow pipeline checks them with rules
+   (dates, amounts, currency, duplicates) and with Gen AI: it flags claims whose cause-of-loss code contradicts the
+   description, and personal data typed into free text. Unity Catalog masks that text and limits each claims team to
+   its own region.
+2. **Detect.** One governed loss-ratio definition marks each segment (line of business × region) RED, AMBER or GREEN
+   on its 7-day and 30-day loss ratio against target, and names the driver: frequency, severity, catastrophe or a
+   large loss.
+3. **Explain and report.** A Genie Agent answers *why* in plain language, and a Genie One skill sends the morning brief
+   to Slack and drafts one email per team.
+4. **Act.** Each RED or AMBER segment maps to owned actions for Claims, Underwriting, Pricing, Reinsurance, Reserving
+   and Finance. Teams work them in an app on Lakebase, and Pricing approves or rejects the proposed rate changes.
 
 The synthetic book has three planted events for the coworker to find:
 
@@ -37,29 +39,29 @@ The synthetic book has three planted events for the coworker to find:
 
 | Layer | Databricks feature | Notebooks |
 |---|---|---|
-| Synthetic source systems | Delta tables, a Unity Catalog volume for raw files | 01, 09 |
-| Governance | Unity Catalog row filter and column mask, comments and tags | 02, 03 |
-| One loss-ratio definition | Metric views (`mv_loss_ratio`, `mv_loss_run`) and the daily watchlist view | 03 |
-| Explain | Genie Agent on the metric views, called by the daily watch through the Conversation API | 04, 06, 14 |
-| Operational store | Lakebase Postgres: actions, quotes, rate actions, a synced table, snapshots back to Delta | 05, 07, 08 |
-| Ingestion and data quality | Lakeflow Spark Declarative Pipeline: Auto Loader, expectations, `ai_classify`, `ai_mask`, `ai_query` | 10 |
-| Forecast | scikit-learn model tracked with MLflow and registered in Unity Catalog | 11 |
-| Where people work | AI/BI dashboard, Genie, Databricks App (Action Desk), Slack and Teams cards | 06, 12, 13 |
+| Landing | Unity Catalog volume with JSON claim files and CSV premium bordereaux | 00, 01 |
+| Bronze | Lakeflow Spark Declarative Pipeline, streaming tables with Auto Loader | 02, `pipeline/01_bronze.sql` |
+| Silver and data quality | expectations, Unity Catalog row filter and column mask, `ai_classify`, `ai_mask`, `ai_query` | 03, `pipeline/02_silver.sql` |
+| Gold | materialized view `gold_daily_loss_run` | 04, `pipeline/03_gold.sql` |
+| One loss-ratio definition | metric views `mv_loss_ratio` and `mv_loss_run`, the watchlist view and the action playbook | 05 |
+| Explain and report | Genie Agent, AI/BI dashboard, Genie One skill with Slack and email connectors | 06, 07, 08 |
+| Act | Lakebase Postgres (actions, quotes, rate actions, synced table) and a Databricks App | 09 to 12 |
 
 ## Step-by-step guide
 
 ### Before you start
 
 - A Unity Catalog workspace with **serverless** notebooks, SQL warehouses and Lakeflow pipelines, plus **Genie**,
-  **Lakebase**, **Databricks Apps** and **Foundation Model APIs** (for `ai_classify`, `ai_mask` and `ai_query`).
-- A catalog where you can create a schema.
-- Lakebase (one CU_1 instance) and the app keep running until you delete them: see *Clean up*.
+  **Genie One**, **Lakebase**, **Databricks Apps** and **Foundation Model APIs** (for `ai_classify`, `ai_mask` and
+  `ai_query`).
+- A catalog you can create a schema in, or the privilege to create the catalog.
+- The Lakebase instance (CU_1) and the app keep running until you delete them: see *Clean up*.
 
 ### Set up
 
 1. In the workspace, go to **Workspace → Create → Git folder** and clone this repository.
-2. Open `notebooks/00_config` and set `CATALOG` (and `WAREHOUSE_ID` if you don't want the first serverless warehouse).
-   Every other notebook runs `00_config` first, so this is the only place you change settings.
+2. Open `notebooks/00_setup`, set `CATALOG` (and `WAREHOUSE_ID` if you don't want the first serverless warehouse), and
+   run it. Every other notebook runs `00_setup` first, so this is the only place you change settings.
 3. Attach each notebook to **serverless** compute and use **Run all**. Run the steps in order and check the output
    before you move on.
 
@@ -67,35 +69,34 @@ The synthetic book has three planted events for the coworker to find:
 
 | Step | Notebook | What it does | Check before moving on |
 |---|---|---|---|
-| 1 | `01_generate_loss_run` | Builds the synthetic book: `policies`, `claims` (the loss run) and `earned_premium_daily`, with the three planted events | The last cell prints the claim count and the hail, motor and large-loss events |
-| 2 | `02_governance_policies` | Creates the region row filter, the free-text column mask and the redaction function | Functions `lrc_region_filter` and `lrc_mask_free_text` exist in the schema |
-| 3 | `03_semantic_layer` | Gold daily loss run, targets, public benchmarks, metric views, the RED/AMBER/GREEN watchlist, comments and tags | `v_loss_ratio_watchlist` includes the three planted segments as RED (another segment can breach by chance) |
-| 4 | `04_genie_agent` | Creates the **Loss Ratio Coworker** Genie Agent and saves its id for step 06 | Open the printed link and ask *"Which segments are RED today?"* |
-| 5 | `05_lakebase_setup` | Creates the Lakebase instance, the `lrc_ops` database, the `ops` and `pricing` schemas, and seeds quotes | The first run waits until the new instance is available |
-| 6 | `06_daily_watch` | Detects RED/AMBER segments, asks Genie why, applies the action playbook, writes `lr_alerts` and `lr_action_recommendations`, publishes the actions to Lakebase, prints the Slack and Teams cards | Each alert has a Genie explanation and a list of team actions |
-| 7 | `07_lakebase_publish_and_transact` | Records today's quotes and the proposed rate actions in one Postgres transaction and syncs the watchlist to Lakebase | `lr_watchlist_serving` is created in Lakebase |
-| 8 | `08_lakebase_snapshot_to_delta` | Copies actions, quotes and rate actions back to Delta for Genie and the pipeline | `lr_action_status`, `bronze_pricing_quotes`, `bronze_rate_actions` exist |
-| 9 | `09_land_raw_files` | Writes the most recent days of claims as FNOL JSON and premium bordereaux CSV into the `raw` volume, about **2,000 claims**, with planted data-quality defects | The printout shows how many days and claims were landed |
-| 10 | `10_lakeflow_pipeline` | Creates and runs the Lakeflow pipeline in `pipeline/lrc_ingest_pipeline.sql`: bronze → silver → Gen AI data quality → gold | The update ends `COMPLETED` and the data-quality scorecard is displayed |
-| 11 | `11_ml_frequency_forecast` | Trains the next-7-day claim-frequency model, registers it in Unity Catalog and joins rising segments with open Lakebase actions | Hold-out error is printed for the model and the naive baseline |
-| 12 | `12_dashboard` | Creates and publishes the **Daily Loss Ratio Watch** AI/BI dashboard | Open the printed link |
-| 13 | `13_action_desk_app` | Deploys the Streamlit **Action Desk** app on Lakebase and grants its service principal access | Open the app, set an action to IN_PROGRESS, then re-run step 08 to see it in Delta |
-| 14 | `14_refresh_genie_agent` | Re-runs step 04 so the agent also covers the pipeline, data-quality and Lakebase tables | Ask *"Which data-quality checks failed today and why?"* |
+| 0 | `00_setup` | Creates the catalog (if missing and allowed), the schema and the `raw` volume | It prints the target catalog, schema and volume |
+| 1 | `01_generate_synthetic_data` | Generates the synthetic book and lands it as files: monthly files for the history, daily drops for the last 30 days, with the three planted events and planted data-quality defects | It prints the records and files landed, the events and the defects |
+| 2 | `02_bronze` | Creates the Lakeflow pipeline with `pipeline/01_bronze.sql` and runs it: Auto Loader reads every file into `bronze_fnol` and `bronze_premium` | Records per table; open the pipeline graph from the printed link |
+| 3 | `03_silver_data_quality` | Creates the row filter and column mask, adds `pipeline/02_silver.sql` and runs it: expectations, de-duplication, then Gen AI checks on the ~2,000 most recent claims | The data-quality scorecard, a few issues with their `ai_explanation`, the masked text |
+| 4 | `04_gold` | Adds `pipeline/03_gold.sql` and runs it: `gold_daily_loss_run`, one row per day, line of business and region | 7-day loss ratio by segment: Property DACH, Motor UK & Ireland and Liability Southern Europe at the top |
+| 5 | `05_metric_views` | Targets, public benchmarks, the metric views, the RED/AMBER/GREEN watchlist, the action playbook and `v_todays_actions`, tags | The watchlist includes the three planted segments as RED (another can breach by chance) |
+| 6 | `06_genie_agent` | Creates the **Loss Ratio Coworker** Genie Agent on the metric views, watchlist, actions and data-quality tables | Open the link and ask *"Why did DACH Property loss ratio jump this week?"* |
+| 7 | `07_dashboard` | Creates and publishes the **Daily Loss Ratio Watch** AI/BI dashboard | Open the printed link |
+| 8 | `08_genie_one_brief` | Instructions to create the `loss-ratio-daily-brief` skill in Genie One, run it, schedule it and connect Slack and email; a cell with today's governed numbers to compare | Genie One's brief matches the numbers in the notebook |
+| 9 | `09_lakebase_setup` | Creates the Lakebase instance, the `lrc_ops` database, the `ops` and `pricing` schemas, and seeds quotes | The first run waits until the new instance is available |
+| 10 | `10_publish_actions_and_pricing` | Publishes `v_todays_actions` into `ops.lr_actions`, records today's quotes and proposed rate actions in one Postgres transaction, syncs the watchlist to Lakebase | It prints the actions published and the synced table state |
+| 11 | `11_action_desk_app` | Deploys the Streamlit **Action Desk** app on Lakebase and grants its service principal access | Open the app and set an action to IN_PROGRESS |
+| 12 | `12_snapshot_to_delta` | Copies actions, quotes and rate actions back to Delta, and builds `gold_rate_adequacy` (indicated vs achieved rate change) | Your app change appears in `lr_action_status` |
+| 13 | `13_refresh_genie_agent` | Re-runs step 06 so the agent also covers team status and rate adequacy | Ask *"Which actions are still open for Reinsurance?"* |
 
-### Optional steps (not needed for the main flow)
+If you re-run step 01, set `FULL_REFRESH = True` in `00_setup` for the next pipeline run (steps 02 to 04), then set it
+back to `False`.
+
+### Optional modules (not needed for the main flow)
 
 | Notebook | What it does | Run after |
 |---|---|---|
-| `optional/A_llm_judge` | An independent model grades each Genie explanation from step 06 (grounded, names the driver, actionable) into `lr_explanation_judge` | step 06 |
-| `optional/B_evaluate_genai_dq` | Scores the Gen AI data-quality checks against the planted defects (precision, recall, F1) and has an LLM judge grade the `ai_query` explanations | step 10 |
-
-### Send the cards to Slack and Teams (optional)
-
-The daily watch prints the Slack and Teams cards. To send them, create a secret scope named `loss_ratio_coworker` with
-the keys `slack_webhook_url` and `teams_webhook_url`, set `DRY_RUN = False` in `00_config`, and re-run step 06.
+| `optional/ml_frequency_forecast` | Trains a next-7-day claim-frequency model on the gold table, registers it in Unity Catalog and escalates rising segments whose Lakebase action is still open | step 04 (step 12 for the escalations) |
+| `optional/genie_why_and_llm_judge` | Asks the Genie Agent *why* for each RED or AMBER segment through the Conversation API, then has an independent model grade each answer into `lr_explanation_judge` | step 06 |
+| `optional/evaluate_genai_dq` | Scores the Gen AI data-quality checks against the planted defects (precision, recall, F1) and has an LLM judge grade the `ai_query` explanations | step 03 |
 
 ### Clean up
 
 Delete what the notebooks created, in this order: the `lrc-action-desk` app, the `lrc-lakebase` Lakebase instance,
-the `[LRC] Lakeflow ingest` pipeline, the dashboard, the Genie Agent, the `lrc_frequency_forecast` model, and finally
-the schema: `DROP SCHEMA <catalog>.loss_ratio_coworker CASCADE`.
+the `[LRC] Loss ratio pipeline`, the dashboard, the Genie Agent, the Genie One skill, the `lrc_frequency_forecast`
+model if you ran the ML module, and finally the schema: `DROP SCHEMA <catalog>.loss_ratio_coworker CASCADE`.

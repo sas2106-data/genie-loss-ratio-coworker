@@ -1,8 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 11 · ML: claim-frequency forecast, registered in Unity Catalog, joined with Lakebase team status
+# MAGIC # Optional · ML: claim-frequency forecast, registered in Unity Catalog, joined with Lakebase team status
 # MAGIC
-# MAGIC The daily watch is rules (is the loss ratio above threshold?) plus Genie (why?). This adds a **trained model**
+# MAGIC **Optional module: the main flow does not need it.** Run it after step 04 (after step 12 for the escalations).
+# MAGIC
+# MAGIC The watchlist is rules (is the loss ratio above threshold?) plus Genie (why?). This adds a **trained model**
 # MAGIC that asks the forward-looking question: *will claim frequency keep rising next week?*
 # MAGIC
 # MAGIC | Step | What |
@@ -24,7 +26,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ../00_setup
 
 # COMMAND ----------
 
@@ -148,6 +150,9 @@ display(spark.table(f"{FQ}.lr_frequency_forecast").orderBy("forecast_vs_4wk_avg_
 # MAGIC (`lr_action_status`, snapshotted from `ops.lr_actions`) is still OPEN. That is the list a CUO wants on Monday.
 
 # COMMAND ----------
+
+if not spark.catalog.tableExists(f"{CATALOG}.{SCHEMA}.lr_action_status"):
+    dbutils.notebook.exit("Forecast written. Run steps 09-12 first to join it with the team status in Lakebase.")
 
 esc = spark.sql(f"""
 SELECT f.line_of_business, f.region, f.claims_last7, f.forecast_next7_claims, f.forecast_vs_4wk_avg_pct,

@@ -1,19 +1,19 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 03 · Semantic layer: gold tables, benchmarks, metric views, ontology
+# MAGIC # 05 · Metric views: one governed loss-ratio definition
 # MAGIC
-# MAGIC This notebook gives the loss ratio **one governed definition** that the dashboard, the Genie Agent, Genie One and the
-# MAGIC daily watch (step 06) all share:
+# MAGIC Everything that reports the loss ratio (Genie, the dashboard, the Genie One brief, the app) reads the objects built
+# MAGIC here, so the CUO, the CFO and every team see the same number.
 # MAGIC
-# MAGIC 1. `gold_daily_loss_run`: incurred loss (as reported) and earned premium per day × line of business × region
-# MAGIC 2. `lr_targets` and `industry_benchmarks`: the bars the book is judged against (with public sources)
-# MAGIC 3. `mv_loss_ratio` and `mv_loss_run`: Unity Catalog **metric views** (YAML v1.1 with display names, synonyms and formats)
-# MAGIC 4. `v_loss_ratio_watchlist`: the daily RAG view (7-day, 30-day and YTD loss ratio, frequency vs severity driver)
-# MAGIC 5. **Ontology context**: table/column comments and governed tags that Genie Ontology picks up
+# MAGIC 1. `lr_targets` and `industry_benchmarks`: the plan per line of business and public reference points
+# MAGIC 2. `mv_loss_ratio` and `mv_loss_run`: Unity Catalog **metric views** on the pipeline's gold and silver tables
+# MAGIC 3. `v_loss_ratio_watchlist`: today's RED / AMBER / GREEN status per segment, with the driver
+# MAGIC 4. `lr_action_playbook` and `v_todays_actions`: who does what for each RED or AMBER segment
+# MAGIC 5. Tags for Genie Ontology
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 
@@ -25,43 +25,7 @@ def run(sql):
 
 # COMMAND ----------
 
-# MAGIC %md ## 1 · Gold: daily loss run
-
-# COMMAND ----------
-
-try:   # a replaced table must not carry yesterday's policy; it is re-attached in step 6
-    run("ALTER TABLE gold_daily_loss_run DROP ROW FILTER")
-except Exception:
-    pass
-
-run("""
-CREATE OR REPLACE TABLE gold_daily_loss_run
-COMMENT 'Daily loss run: incurred loss on the date it was reported, earned premium for the day, by line of business and region.'
-AS
-WITH c AS (
-  SELECT CAST(report_date AS DATE) AS as_of_date, line_of_business, region,
-         SUM(incurred_loss)                                       AS incurred_loss,
-         SUM(paid_loss)                                           AS paid_loss,
-         SUM(case_reserve)                                        AS case_reserve,
-         COUNT(*)                                                 AS claim_count,
-         SUM(CASE WHEN large_loss_flag THEN incurred_loss ELSE 0 END) AS large_loss_incurred,
-         SUM(CASE WHEN large_loss_flag THEN 1 ELSE 0 END)         AS large_loss_count,
-         SUM(CASE WHEN cat_event_flag THEN incurred_loss ELSE 0 END)  AS cat_incurred
-  FROM claims GROUP BY ALL
-)
-SELECT CAST(e.as_of_date AS DATE) AS as_of_date, e.line_of_business, e.region, e.earned_premium,
-       COALESCE(c.incurred_loss,0) incurred_loss, COALESCE(c.paid_loss,0) paid_loss,
-       COALESCE(c.case_reserve,0) case_reserve, COALESCE(c.claim_count,0) claim_count,
-       COALESCE(c.large_loss_incurred,0) large_loss_incurred, COALESCE(c.large_loss_count,0) large_loss_count,
-       COALESCE(c.cat_incurred,0) cat_incurred
-FROM earned_premium_daily e
-LEFT JOIN c ON CAST(e.as_of_date AS DATE) = c.as_of_date
-  AND e.line_of_business = c.line_of_business AND e.region = c.region
-""")
-
-# COMMAND ----------
-
-# MAGIC %md ## 2 · Targets and public industry benchmarks
+# MAGIC %md ## 1 · Targets and public industry benchmarks
 
 # COMMAND ----------
 
@@ -96,9 +60,10 @@ INSERT INTO industry_benchmarks VALUES
  ('Global Insurance Customer P&C', 'Combined ratio', 'FY2025', 0.941, 'All-year, undiscounted (reported + 3.5 pts discount benefit)', 'Global Insurance Customer, Full-Year 2025 results (public)', NULL)
 """)
 
+
 # COMMAND ----------
 
-# MAGIC %md ## 3 · Metric views (YAML 1.1 with agent metadata)
+# MAGIC %md ## 2 · Metric views (YAML 1.1 with agent metadata)
 
 # COMMAND ----------
 
@@ -199,7 +164,7 @@ WITH METRICS LANGUAGE YAML
 COMMENT 'Claim-level loss run: incurred, paid, reserves and recoveries by cause of loss, status and event.'
 AS $$
 version: 1.1
-source: {CATALOG}.{SCHEMA}.claims
+source: {CATALOG}.{SCHEMA}.silver_claims
 fields:
   - name: report_date
     expr: report_date
@@ -256,9 +221,10 @@ measures:
 $$
 """)
 
+
 # COMMAND ----------
 
-# MAGIC %md ## 4 · The daily watchlist (what the daily watch and Genie read every morning)
+# MAGIC %md ## 3 · The daily watchlist (what Genie, the dashboard and the Genie One brief read every morning)
 
 # COMMAND ----------
 
@@ -309,57 +275,74 @@ SELECT *,
 FROM w
 """)
 
-# COMMAND ----------
-
-# MAGIC %md ## 4b · Alert and action tables (written by the daily watch in step 06, read by Genie and the dashboard)
 
 # COMMAND ----------
 
-run("""
-CREATE TABLE IF NOT EXISTS lr_alerts (
-  alert_id STRING, as_of_date DATE, line_of_business STRING, region STRING, status STRING, primary_driver STRING,
-  lr_7d DOUBLE, lr_30d DOUBLE, target_loss_ratio DOUBLE, gap_7d_pts DOUBLE, freq_change DOUBLE, sev_change DOUBLE,
-  large_losses_7d INT, genie_explanation STRING, created_at TIMESTAMP
-) COMMENT 'Daily loss-ratio alerts (RED/AMBER) with the Genie Agent explanation of why the segment moved.'
-""")
-run("""
-CREATE TABLE IF NOT EXISTS lr_action_recommendations (
-  alert_id STRING, team STRING, action STRING, due_within STRING, priority STRING, state STRING, created_at TIMESTAMP
-) COMMENT 'Actions recommended to downstream teams for each loss-ratio alert. state = Open / In progress / Done.'
-""")
+# MAGIC %md
+# MAGIC ## 4 · The action playbook and today's actions
+# MAGIC Rules, not an LLM, so every action is auditable: the driver of each RED or AMBER segment maps to owned actions for
+# MAGIC Claims, Underwriting, Pricing, Reinsurance, Reserving and Finance.
 
 # COMMAND ----------
 
-# MAGIC %md ## 5 · Ontology context: comments and governed tags
-# MAGIC Genie Ontology combines this curated Unity Catalog context with what it infers from usage. Clear comments and tags
-# MAGIC are the cheapest accuracy win you can buy.
-
-# COMMAND ----------
-
-COLS = {
-  "claims": {
-    "incurred_loss": "Paid loss plus case reserve for the claim (EUR), before recoveries.",
-    "report_date": "Date the claim was reported to the insurer. Daily loss ratio uses this date.",
-    "loss_date": "Date the loss event happened.",
-    "cause_of_loss": "Peril that caused the loss (e.g. Hail, Collision, Bodily Injury).",
-    "event_tag": "Named event the claim belongs to, null for attritional claims.",
-    "large_loss_flag": "True when incurred loss is EUR 250k or more.",
-    "cat_event_flag": "True when the claim belongs to a catastrophe event.",
-  },
-  "gold_daily_loss_run": {
-    "as_of_date": "Report date (the day losses hit the books).",
-    "earned_premium": "Premium earned on the day (EUR).",
-    "incurred_loss": "Incurred loss reported on the day (EUR).",
-  },
+PLAYBOOK = {
+    "Catastrophe event": [
+        ("Claims", "Stand up the event response: surge adjusters, fast-track triage of the event claims, daily event count.", "24h"),
+        ("Reinsurance", "Notify cat XL reinsurers of a potential event and estimate the recovery against the retention.", "48h"),
+        ("Reserving", "Book an event IBNR estimate so the month-end loss ratio reflects claims not yet reported.", "5 days"),
+        ("Underwriting", "Check accumulation in the affected area and hold new binds above the referral limit.", "48h"),
+        ("Finance", "Flag the event in the month-end outlook with gross and net-of-reinsurance impact.", "Month-end"),
+    ],
+    "Frequency": [
+        ("Underwriting", "Review risk selection and rate adequacy on renewals in this segment; check broker and channel mix.", "Next renewal cycle"),
+        ("Pricing", "Test whether the frequency trend is in the rating model and price a frequency load if it persists.", "2 weeks"),
+        ("Claims", "Screen the cluster of new claims for fraud indicators and repeat insureds.", "1 week"),
+    ],
+    "Large loss": [
+        ("Claims", "Assign a senior handler, convene the large-loss committee and review the case reserve.", "48h"),
+        ("Reinsurance", "Check whether the claim reaches the per-risk XL attachment and notify reinsurers.", "1 week"),
+        ("Underwriting", "Review the account and similar risks before renewal.", "Before renewal"),
+    ],
+    "Severity": [
+        ("Claims", "Analyse repair, supplier and legal cost inflation on the affected causes of loss.", "2 weeks"),
+        ("Pricing", "Refresh the severity trend assumption in pricing.", "Next pricing review"),
+    ],
+    "Within normal variation": [
+        ("Underwriting", "Monitor. No action unless the 30-day loss ratio also breaches.", "Next daily run"),
+    ],
 }
-for tbl, cols in COLS.items():
-    for col, txt in cols.items():
-        run(f"ALTER TABLE {tbl} ALTER COLUMN {col} COMMENT '{txt}'")
 
-# Tag keys can be governed by tag policies in your account; tagging is best-effort so it never blocks setup.
+rows = [(driver, i, team, action, due) for driver, acts in PLAYBOOK.items() for i, (team, action, due) in enumerate(acts, 1)]
+(spark.createDataFrame(rows, "primary_driver STRING, seq INT, team STRING, action STRING, due_within STRING")
+     .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{FQ}.lr_action_playbook"))
+run("COMMENT ON TABLE lr_action_playbook IS 'Action playbook: the owned actions per team for each loss-ratio driver.'")
+run("""
+CREATE OR REPLACE VIEW v_todays_actions
+COMMENT 'Today''s actions: every RED or AMBER segment of the watchlist joined with the playbook for its driver. P1 = RED, P2 = AMBER.'
+AS SELECT concat('LR-', date_format(w.as_of_date, 'yyyyMMdd'), '-', upper(substr(w.line_of_business, 1, 3)), '-',
+                 upper(substr(split(w.region, ' ')[0], 1, 4))) AS alert_id,
+          w.as_of_date, w.line_of_business, w.region, w.status AS alert_status, w.primary_driver,
+          ROUND(w.lr_7d, 4) AS lr_7d, w.target_loss_ratio, w.gap_7d_pts,
+          p.team, IF(w.status = 'RED', 'P1', 'P2') AS priority, p.action, p.due_within
+   FROM v_loss_ratio_watchlist w JOIN lr_action_playbook p USING (primary_driver)
+   WHERE w.status IN ('RED', 'AMBER')
+""")
+display(spark.sql("SELECT alert_id, priority, team, line_of_business, region, primary_driver, action, due_within FROM v_todays_actions ORDER BY priority, alert_id, team"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 5 · Tags for Genie Ontology
+# MAGIC Genie Ontology combines this curated Unity Catalog context (comments, which the pipeline and the views above
+# MAGIC already carry, and tags) with what it infers from usage.
+
+# COMMAND ----------
+
+# Tag keys can be governed by tag policies in your account; tagging is best-effort so it never blocks the tutorial.
 TAGS = "('business_area' = 'insurance', 'subject_area' = 'loss_ratio', 'lrc_certified' = 'true')"
-for kind, objs in [("TABLE", ["claims", "gold_daily_loss_run", "lr_targets", "industry_benchmarks"]),
-                   ("VIEW", ["mv_loss_ratio", "mv_loss_run", "v_loss_ratio_watchlist"])]:
+for kind, objs in [("TABLE", ["lr_targets", "industry_benchmarks", "lr_action_playbook"]),
+                   ("VIEW", ["mv_loss_ratio", "mv_loss_run", "v_loss_ratio_watchlist", "v_todays_actions"]),
+                   ("MATERIALIZED VIEW", ["silver_claims", "gold_daily_loss_run"])]:
     for obj in objs:
         try:
             run(f"ALTER {kind} {obj} SET TAGS {TAGS}")
@@ -369,22 +352,3 @@ for kind, objs in [("TABLE", ["claims", "gold_daily_loss_run", "lr_targets", "in
 # COMMAND ----------
 
 display(spark.sql("SELECT line_of_business, region, status, primary_driver, ROUND(lr_7d,3) lr_7d, ROUND(lr_30d,3) lr_30d, target_loss_ratio, gap_7d_pts FROM v_loss_ratio_watchlist ORDER BY gap_7d_pts DESC"))
-
-# COMMAND ----------
-
-# MAGIC %md ## 6 · Row-level security: each regional team sees only its own book
-# MAGIC `lrc_region_filter(region)` (created in step 02) is attached to the governed gold
-# MAGIC table, so the metric views, the dashboard, Genie and Power BI DirectQuery all inherit it: a member of
-# MAGIC `lrc_claims_dach` sees only DACH, `lrc_claims_all` sees every region, and workspace admins see all.
-
-# COMMAND ----------
-
-try:
-    run(f"ALTER TABLE gold_daily_loss_run SET ROW FILTER {CATALOG}.{SCHEMA}.lrc_region_filter ON (region)")
-    display(spark.sql(f"""SELECT table_name, filter_name, target_columns FROM {CATALOG}.information_schema.row_filters
-                          WHERE table_schema = '{SCHEMA}' ORDER BY table_name"""))
-    display(spark.sql(f"""SELECT a.group_name, COUNT(DISTINCT g.region) AS regions_visible, ROUND(SUM(g.incurred_loss) / 1e6, 1) AS incurred_eur_m
-                          FROM gold_daily_loss_run g JOIN {CATALOG}.{SCHEMA}.lrc_region_access a ON a.region = g.region
-                          GROUP BY a.group_name ORDER BY a.group_name"""))
-except Exception as e:
-    print(f"row filter not attached (run step 02 first): {str(e).splitlines()[0][:200]}")

@@ -1,38 +1,25 @@
--- Lakeflow Spark Declarative Pipeline: raw volume → bronze → silver → Gen AI data quality → gold
+-- Lakeflow Spark Declarative Pipeline · SILVER + DATA QUALITY (added by notebooks/03_silver_data_quality)
 --
--- Ingests the synthetic source files landed by notebooks/09_land_raw_files with Auto Loader, cleans and
--- de-duplicates them with expectations, runs Gen AI data-quality checks on the free-text loss descriptions, and
--- publishes a gold daily loss run with the same shape as gold_daily_loss_run. It also builds gold_rate_adequacy from
--- the Lakebase pricing snapshot (notebooks/08_lakebase_snapshot_to_delta).
---
--- Pipeline configuration (set by notebooks/10_lakeflow_pipeline from 00_config):
---   raw_path          /Volumes/<catalog>/<schema>/raw
---   llm_endpoint      a Foundation Model API chat endpoint, e.g. databricks-meta-llama-3-3-70b-instruct
---   ai_lookback_days  how many report days the AI checks cover (bounds token cost), e.g. 14
-
--- ═══ BRONZE: files as they landed, plus ingestion metadata ═══════════════════════════════════════════════════════
-
-CREATE OR REFRESH STREAMING TABLE bronze_fnol
-COMMENT 'Bronze: first-notice-of-loss claim records exactly as landed in the raw volume (JSON), with source file and ingestion time.'
-AS SELECT *, _metadata.file_path AS source_file, current_timestamp() AS ingested_at
-FROM STREAM read_files('${raw_path}/claims_fnol/', format => 'json',
-                       schemaHints => 'claim_id STRING, policy_id STRING, loss_date STRING, report_date STRING, incurred_loss DOUBLE, paid_loss DOUBLE, case_reserve DOUBLE, currency STRING');
-
-CREATE OR REFRESH STREAMING TABLE bronze_premium
-COMMENT 'Bronze: premium bordereaux exactly as landed in the raw volume (CSV), with source file and ingestion time.'
-AS SELECT *, _metadata.file_path AS source_file, current_timestamp() AS ingested_at
-FROM STREAM read_files('${raw_path}/premium_bordereaux/', format => 'csv', header => true,
-                       schemaHints => 'as_of_date STRING, earned_premium DOUBLE');
+-- Types, de-duplicates and checks the bronze records with expectations, attaches the Unity Catalog row filter and
+-- column mask, then runs Gen AI checks on the free text of the most recent claims: ai_classify (peril vs coded cause),
+-- ai_mask (personal data) and ai_query (a plain-English explanation and fix per issue).
+-- Configuration: policy_schema, llm_endpoint, ai_lookback_days, max_ai_claims
 
 -- ═══ SILVER: typed, de-duplicated, rule-based expectations ═══════════════════════════════════════════════════════
 
--- Unity Catalog policies (functions created by notebooks/02_governance_policies):
+-- Unity Catalog policies (functions created at the start of notebooks/03_silver_data_quality):
 --   row filter   ${policy_schema}.lrc_region_filter(region)        a claims team sees only its own region's book
 --   column mask  ${policy_schema}.lrc_mask_free_text(description)  raw free text only for lrc_pii_readers (GDPR)
 CREATE OR REFRESH MATERIALIZED VIEW silver_claims (
-  claim_id STRING, policy_id STRING, line_of_business STRING, region STRING, loss_date DATE, report_date DATE,
-  cause_of_loss STRING, incurred_loss DOUBLE, paid_loss DOUBLE, case_reserve DOUBLE, currency STRING, event_tag STRING,
-  large_loss_flag BOOLEAN, cat_event_flag BOOLEAN,
+  claim_id STRING, policy_id STRING, line_of_business STRING, region STRING,
+  loss_date DATE COMMENT 'Date the loss event happened.',
+  report_date DATE COMMENT 'Date the claim was reported to the insurer. The daily loss ratio uses this date.',
+  cause_of_loss STRING COMMENT 'Peril that caused the loss (e.g. Hail, Collision, Bodily Injury).',
+  incurred_loss DOUBLE COMMENT 'Paid loss plus case reserve for the claim (EUR), before recoveries.',
+  paid_loss DOUBLE, case_reserve DOUBLE, claim_status STRING, currency STRING,
+  event_tag STRING COMMENT 'Named event the claim belongs to, null for attritional claims.',
+  large_loss_flag BOOLEAN COMMENT 'True when incurred loss is EUR 250k or more.',
+  cat_event_flag BOOLEAN COMMENT 'True when the claim belongs to a catastrophe event.',
   loss_description STRING MASK ${policy_schema}.lrc_mask_free_text,
   source_system STRING, source_file STRING, ingested_at TIMESTAMP,
   CONSTRAINT has_claim_id        EXPECT (claim_id IS NOT NULL)            ON VIOLATION DROP ROW,
@@ -45,7 +32,7 @@ WITH ROW FILTER ${policy_schema}.lrc_region_filter ON (region)
 COMMENT 'Silver: one row per claim (latest version), typed dates and amounts, rule-based expectations recorded in the pipeline event log. Row filter by region; free text masked for non-PII readers.'
 AS SELECT claim_id, policy_id, line_of_business, region,
           CAST(loss_date AS DATE) AS loss_date, CAST(report_date AS DATE) AS report_date,
-          cause_of_loss, incurred_loss, paid_loss, case_reserve, currency, event_tag,
+          cause_of_loss, incurred_loss, paid_loss, case_reserve, claim_status, currency, event_tag,
           incurred_loss >= 250000 AS large_loss_flag, event_tag = 'Hailstorm DACH' AS cat_event_flag,
           loss_description, source_system, source_file, ingested_at
 FROM bronze_fnol
@@ -63,11 +50,12 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY as_of_date, line_of_business, region ORD
 -- ═══ GEN AI DATA QUALITY: read the free text, not just the codes ═════════════════════════════════════════════════
 
 CREATE OR REFRESH MATERIALIZED VIEW silver_claims_ai_checked
-COMMENT 'Gen AI data quality on recent claims: ai_classify infers the peril from the free-text description and compares it with the coded cause of loss; ai_mask redacts personal data. Only the masked text is kept.'
+COMMENT 'Gen AI data quality on the most recent claims (at most max_ai_claims): ai_classify infers the peril from the free-text description and compares it with the coded cause of loss; ai_mask redacts personal data. Only the masked text is kept.'
 AS
 WITH recent AS (
   SELECT * FROM silver_claims
   WHERE report_date >= date_sub(current_date(), CAST('${ai_lookback_days}' AS INT))
+  QUALIFY ROW_NUMBER() OVER (ORDER BY report_date DESC, claim_id) <= CAST('${max_ai_claims}' AS INT)   -- bounds token cost
 ),
 ai AS (
   SELECT *,
@@ -147,69 +135,3 @@ issues AS (
 SELECT i.report_date, i.check_name, i.check_type, i.severity, i.issues, c.records_checked,
        ROUND(1 - i.issues / c.records_checked, 4) AS pass_rate
 FROM issues i JOIN checked c USING (report_date);
-
--- ═══ GOLD: the daily loss run from the governed pipeline ═════════════════════════════════════════════════════════
-
-CREATE OR REFRESH MATERIALIZED VIEW gold_daily_loss_run_lf
-COMMENT 'Gold (Lakeflow): incurred loss on the date reported and earned premium per day × line of business × region, built from the raw files. Same shape as gold_daily_loss_run; claims with a negative amount or non-EUR currency are excluded until fixed.'
-AS
-WITH c AS (
-  SELECT report_date AS as_of_date, line_of_business, region,
-         SUM(incurred_loss) AS incurred_loss, SUM(paid_loss) AS paid_loss, SUM(case_reserve) AS case_reserve,
-         COUNT(*) AS claim_count,
-         SUM(CASE WHEN large_loss_flag THEN incurred_loss ELSE 0 END) AS large_loss_incurred,
-         SUM(CASE WHEN large_loss_flag THEN 1 ELSE 0 END) AS large_loss_count,
-         SUM(CASE WHEN cat_event_flag THEN incurred_loss ELSE 0 END) AS cat_incurred
-  FROM silver_claims WHERE incurred_loss >= 0 AND currency = 'EUR' GROUP BY ALL
-)
-SELECT p.as_of_date, p.line_of_business, p.region, p.earned_premium,
-       COALESCE(c.incurred_loss, 0) incurred_loss, COALESCE(c.paid_loss, 0) paid_loss, COALESCE(c.case_reserve, 0) case_reserve,
-       COALESCE(c.claim_count, 0) claim_count, COALESCE(c.large_loss_incurred, 0) large_loss_incurred,
-       COALESCE(c.large_loss_count, 0) large_loss_count, COALESCE(c.cat_incurred, 0) cat_incurred
-FROM silver_premium p
-LEFT JOIN c ON p.as_of_date = c.as_of_date AND p.line_of_business = c.line_of_business AND p.region = c.region;
-
--- ═══ GOLD: rate adequacy, joining Lakebase pricing transactions with the loss ratio ══════════════════════════════
-
-CREATE OR REFRESH MATERIALIZED VIEW gold_rate_adequacy
-COMMENT 'Rate adequacy per line of business × region over the last 30 days. Indicated rate change = 30-day loss ratio ÷ target − 1 (loss-ratio method); compared with the rate change actually achieved on quotes in the Lakebase pricing system and with rate actions the coworker proposed.'
-AS
-WITH q AS (
-  SELECT line_of_business, region, COUNT(*) AS quotes,
-         AVG(CASE WHEN status = 'BOUND' THEN 1.0 ELSE 0.0 END) AS bind_ratio,
-         AVG(CASE WHEN status = 'REFERRED' THEN 1.0 ELSE 0.0 END) AS referral_ratio,
-         AVG(rate_change_pct) AS avg_rate_change_pct,
-         AVG(quoted_premium / NULLIF(technical_premium, 0)) AS price_to_technical
-  FROM bronze_pricing_quotes
-  WHERE CAST(created_at AS DATE) > date_sub(current_date(), 30) GROUP BY ALL
-),
-ra AS (
-  SELECT line_of_business, region, COUNT(*) AS proposed_rate_actions, MAX(rate_change_pct) AS max_proposed_rate_change_pct
-  FROM bronze_rate_actions WHERE status = 'PROPOSED' GROUP BY ALL
-),
-lr AS (
-  SELECT line_of_business, region, SUM(incurred_loss) / NULLIF(SUM(earned_premium), 0) AS loss_ratio_30d
-  FROM gold_daily_loss_run_lf WHERE as_of_date > date_sub(current_date(), 30) GROUP BY ALL
-),
-j AS (
-  SELECT lr.line_of_business, lr.region,
-         ROUND(lr.loss_ratio_30d, 4) AS loss_ratio_30d, t.target_loss_ratio,
-         ROUND((lr.loss_ratio_30d - t.target_loss_ratio) * 100, 1) AS lr_gap_pts,
-         ROUND((lr.loss_ratio_30d / t.target_loss_ratio - 1) * 100, 1) AS indicated_rate_change_pct,
-         q.quotes, ROUND(q.bind_ratio, 3) AS bind_ratio, ROUND(q.referral_ratio, 3) AS referral_ratio,
-         ROUND(q.avg_rate_change_pct, 1) AS achieved_rate_change_pct, ROUND(q.price_to_technical, 3) AS price_to_technical,
-         COALESCE(ra.proposed_rate_actions, 0) AS proposed_rate_actions, ra.max_proposed_rate_change_pct
-  FROM lr
-  JOIN lr_targets t USING (line_of_business)
-  LEFT JOIN q USING (line_of_business, region)
-  LEFT JOIN ra USING (line_of_business, region)
-)
-SELECT *,
-       ROUND(indicated_rate_change_pct - COALESCE(achieved_rate_change_pct, 0), 1) AS rate_shortfall_pts,
-       CASE WHEN indicated_rate_change_pct > COALESCE(achieved_rate_change_pct, 0) + 2 AND proposed_rate_actions > 0
-              THEN 'Rate action proposed: awaiting pricing decision'
-            WHEN indicated_rate_change_pct > COALESCE(achieved_rate_change_pct, 0) + 2
-              THEN 'Rate inadequate: achieved rate change below indicated, no rate action'
-            WHEN lr_gap_pts > 0 THEN 'Monitor: above target, achieved rate change covers the gap'
-            ELSE 'Adequate' END AS adequacy_status
-FROM j;

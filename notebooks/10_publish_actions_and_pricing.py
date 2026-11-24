@@ -1,16 +1,17 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 07 · Lakebase: publish actions, record pricing transactions, sync the watchlist
+# MAGIC # 10 · Lakebase: publish today's actions, record pricing transactions, sync the watchlist
 # MAGIC
-# MAGIC Run it after the daily watch (step 06):
+# MAGIC Run it after step 09:
 # MAGIC
-# MAGIC 1. **Actions** are published to Lakebase `ops.lr_actions` by the daily watch (step 4b); this notebook checks them.
+# MAGIC 1. **Actions**: every row of `v_todays_actions` is inserted into Lakebase `ops.lr_actions` (`ON CONFLICT DO NOTHING`,
+# MAGIC    so a team's status, owner and note are never overwritten). Teams then work them in the Action Desk app.
 # MAGIC 2. **Pricing transactions**: today's quotes from the pricing desk (simulated), with a **referral** when the
 # MAGIC    segment is RED, and one **PROPOSED rate action** per Pricing action from the coworker (idempotent on
 # MAGIC    `source_action_id`). All in a single Postgres transaction.
 # MAGIC 3. **Synced table**: refresh Delta `lr_watchlist_snapshot` and sync it into Lakebase as
 # MAGIC    `lr_watchlist_serving`, so the Action Desk app reads today's RAG status in milliseconds.
-# MAGIC 4. Grant the Action Desk app's service principal access to the operational tables (skipped until step 13 deploys the app).
+# MAGIC 4. Grant the Action Desk app's service principal access to the operational tables (skipped until step 11 deploys the app).
 
 # COMMAND ----------
 
@@ -22,7 +23,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 
@@ -36,14 +37,9 @@ FQ = f"`{CATALOG}`.`{SCHEMA}`"
 
 inst = ensure_instance(INSTANCE)
 
-# Latest alert per segment and its actions (the daily watch appends; take the newest run)
-actions = spark.sql(f"""
-  WITH latest AS (SELECT MAX(as_of_date) d FROM {FQ}.lr_alerts)
-  SELECT a.alert_id, a.as_of_date, a.line_of_business, a.region, a.status AS alert_status, a.primary_driver,
-         r.team, r.priority, r.action, r.due_within
-  FROM {FQ}.lr_alerts a JOIN {FQ}.lr_action_recommendations r USING (alert_id)
-  WHERE a.as_of_date = (SELECT d FROM latest)
-""").toPandas()
+# Today's actions from the governed view (step 05)
+actions = spark.sql(f"""SELECT alert_id, as_of_date, line_of_business, region, alert_status, primary_driver, team, priority,
+                               action, due_within FROM {FQ}.v_todays_actions""").toPandas()
 watch = spark.table(f"{FQ}.v_loss_ratio_watchlist").toPandas()
 print(f"{len(actions)} actions for {actions.alert_id.nunique() if len(actions) else 0} alerts; {len(watch)} watchlist segments")
 
@@ -59,9 +55,15 @@ rng = np.random.default_rng(int(datetime.now().strftime("%Y%m%d")))
 
 with connect(inst, DB) as c:
     with c.transaction():
-        # 1 · actions are published by the daily watch itself (step 06, section 4b)
-        pub = c.execute("SELECT count(*) FROM ops.lr_actions WHERE as_of_date = %s",
-                        (actions.as_of_date.max() if len(actions) else None,)).fetchone()[0]
+        # 1 · publish today's actions (idempotent: a team's status, owner and note are never overwritten)
+        pub = 0
+        for x in actions.itertuples():
+            cur = c.execute("""INSERT INTO ops.lr_actions (action_id, alert_id, as_of_date, line_of_business, region, alert_status,
+                                 primary_driver, team, priority, action, due_within)
+                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (action_id) DO NOTHING""",
+                            (f"{x.alert_id}:{x.team}", x.alert_id, x.as_of_date, x.line_of_business, x.region, x.alert_status,
+                             x.primary_driver, x.team, x.priority, x.action, x.due_within))
+            pub += cur.rowcount
         # 2a · today's quotes from the pricing desk; RED segments are referred to a senior underwriter
         day = datetime.now(timezone.utc).strftime("%Y%m%d")
         if not c.execute("SELECT 1 FROM pricing.quotes WHERE quote_id LIKE %s LIMIT 1", (f"Q-{day}-%",)).fetchone():
@@ -88,7 +90,7 @@ with connect(inst, DB) as c:
                              RATE_BY_DRIVER.get(str(r.primary_driver).lower(), 3.0),
                              f"{r.alert_status} on loss ratio, driver {r.primary_driver}: {r.action}", "loss-ratio-coworker"))
             props += cur.rowcount
-    print(f"{pub} actions for today already in Lakebase (published by the daily watch) · proposed {props} rate actions")
+    print(f"published {pub} new actions ({len(actions) - pub} already there, team updates kept) · proposed {props} rate actions")
     for t in ["ops.lr_actions", "pricing.quotes", "pricing.rate_actions"]:
         print(t, c.execute(f"SELECT count(*) FROM {t}").fetchone()[0])
 

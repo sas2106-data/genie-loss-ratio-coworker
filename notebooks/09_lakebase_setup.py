@@ -1,16 +1,16 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 05 · Lakebase: operational store for actions, team status and pricing transactions
+# MAGIC # 09 · Lakebase: operational store for actions, team status and pricing transactions
 # MAGIC
 # MAGIC **Lakebase** (managed, serverless Postgres) is the coworker's **low-latency operational layer**. Delta stays the
 # MAGIC analytical system of record; Lakebase holds the rows that people and apps *change* during the day.
 # MAGIC
 # MAGIC | Postgres table | Written by | Read by |
 # MAGIC |---|---|---|
-# MAGIC | `ops.lr_actions` | the daily watch (step 06) publishes new actions; team leads update **status, owner, note** in the Action Desk app | Action Desk app; snapshotted back to Delta for Genie |
+# MAGIC | `ops.lr_actions` | step 10 publishes today's actions; team leads update **status, owner, note** in the Action Desk app | Action Desk app; snapshotted back to Delta for Genie |
 # MAGIC | `pricing.quotes` | the pricing desk (simulated transactional quoting) | Lakeflow `gold_rate_adequacy` (via Delta snapshot) |
 # MAGIC | `pricing.rate_actions` | the coworker proposes rate changes for Pricing actions; the pricing desk approves/rejects | Action Desk app, `gold_rate_adequacy` |
-# MAGIC | `<schema>.lr_watchlist_serving` | **synced table** from Delta `lr_watchlist_snapshot` (created in step 07) | Action Desk app (millisecond reads) |
+# MAGIC | `<schema>.lr_watchlist_serving` | **synced table** from Delta `lr_watchlist_snapshot` (created in step 10) | Action Desk app (millisecond reads) |
 # MAGIC
 # MAGIC This notebook is idempotent: it creates the instance, database, schemas and tables if missing, and seeds 120
 # MAGIC days of synthetic quotes once.
@@ -25,7 +25,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 

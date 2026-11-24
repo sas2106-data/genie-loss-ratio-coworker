@@ -1,12 +1,12 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 13 · Databricks App on Lakebase: the Action Desk
+# MAGIC # 11 · Databricks App on Lakebase: the Action Desk
 # MAGIC
 # MAGIC Deploys the Streamlit app in `app/action_desk/` (in this Git folder). Team leads acknowledge, own and close the
-# MAGIC actions from the daily watch; the pricing desk approves or rejects proposed rate actions. Every change is a Postgres
-# MAGIC transaction in Lakebase, which step 08 copies back into Delta the next time it runs.
+# MAGIC actions published in step 10; the pricing desk approves or rejects proposed rate actions. Every change is a Postgres
+# MAGIC transaction in Lakebase, which step 12 copies back into Delta.
 # MAGIC
-# MAGIC The app reads `LAKEBASE_INSTANCE` and `LRC_SCHEMA` from `app/action_desk/app.yaml`: keep them in line with `00_config`.
+# MAGIC The app reads `LAKEBASE_INSTANCE` and `LRC_SCHEMA` from `app/action_desk/app.yaml`: keep them in line with `00_setup`.
 
 # COMMAND ----------
 
@@ -18,7 +18,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 

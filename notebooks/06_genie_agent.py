@@ -1,16 +1,15 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 04 · Genie Agent: "Loss Ratio Coworker"
+# MAGIC # 06 · Genie Agent: "Loss Ratio Coworker"
 # MAGIC
 # MAGIC Creates (or updates) a Genie Agent on the governed metric views, so Genie answers with the same loss ratio as the
-# MAGIC dashboard and the daily watch. The daily watch (step 06) asks this agent *why* each segment moved.
+# MAGIC dashboard and the Genie One brief (step 08).
 # MAGIC
-# MAGIC The agent picks up the Lakeflow, data-quality and Lakebase tables only once they exist, so step 14 runs this
-# MAGIC notebook again at the end.
+# MAGIC The Lakebase tables (team status, rate adequacy) are added once they exist: step 13 runs this notebook again.
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 
@@ -30,19 +29,17 @@ TABLES = {
     "mv_loss_ratio": "Governed metric view. Use for loss ratio, combined ratio, target gap, frequency, severity by day/LOB/region.",
     "mv_loss_run": "Governed metric view of the claim-level loss run by cause of loss, event, status and large-loss flag.",
     "v_loss_ratio_watchlist": "Today's RED/AMBER/GREEN watch per line of business and region with 7-day, 30-day and YTD loss ratio and the main driver.",
-    "lr_action_recommendations": "Actions recommended to downstream teams (Claims, Underwriting, Pricing, Reinsurance, Reserving, Finance) for each alert.",
-    "lr_alerts": "History of daily loss-ratio alerts with Genie's explanation.",
+    "v_todays_actions": "Today's actions for downstream teams (Claims, Underwriting, Pricing, Reinsurance, Reserving, Finance) for each RED or AMBER segment, with priority and due date.",
+    "dq_daily_scorecard": "Daily data-quality scorecard from the Lakeflow pipeline: records checked, issues and pass rate per check (rule-based and Gen AI).",
+    "dq_claims_issues": "One row per claim data-quality issue (peril mismatch found by ai_classify, personal data found by ai_mask, negative amounts, date and currency errors) with an ai_query explanation and suggested fix. Personal data is masked.",
     "industry_benchmarks": "Public combined-ratio benchmarks (AM Best US P&C industry, Global Insurance Customer P&C) with sources.",
     "lr_targets": "Plan loss ratio, expense ratio, alert thresholds and owner team per line of business.",
 }
 
-# Added once the Lakeflow pipeline and the Lakebase snapshots exist (step 14 re-runs this notebook)
+# Added once the Lakebase snapshots exist (step 12); step 13 re-runs this notebook
 EXTENDED_TABLES = {
-    "dq_daily_scorecard": "Daily data-quality scorecard from the Lakeflow pipeline: records checked, issues and pass rate per check (rule-based and Gen AI).",
-    "dq_claims_issues": "One row per claim data-quality issue (peril mismatch found by ai_classify, personal data found by ai_mask, negative amounts, date and currency errors) with an ai_query explanation and suggested fix. Personal data is masked.",
     "lr_action_status": "Team status of each loss-ratio action (OPEN, ACKNOWLEDGED, IN_PROGRESS, DONE) with owner and note, snapshotted from the Lakebase operational store.",
     "gold_rate_adequacy": "Rate adequacy per line of business and region: 30-day loss ratio vs target, quotes, bind ratio and average rate change from the Lakebase pricing system, and proposed rate actions.",
-    "gold_daily_loss_run_lf": "Daily loss run built by the Lakeflow pipeline from the raw files (same shape as gold_daily_loss_run).",
 }
 
 INSTRUCTIONS = """\
@@ -57,7 +54,7 @@ Definitions (always use these):
 How to answer:
 - Lead with the number and its gap to target in percentage points, then the driver, then what to do.
 - When asked "why", split the change into frequency versus severity and name the top causes of loss, events and large losses from mv_loss_run.
-- When asked "what should we do" or "who needs to act", read lr_action_recommendations for the latest alerts and group by team.
+- When asked "what should we do" or "who needs to act", read v_todays_actions and group by team.
 - When asked how we compare with the market, use industry_benchmarks and always name the source and basis (e.g. AM Best FY2025 US P&C 92.9%). Do not present benchmarks as targets.
 - Format ratios as percentages with one decimal and money as EUR with k/m suffixes. Keep answers short enough to read on a phone.
 - Data quality: use dq_daily_scorecard for pass rates and dq_claims_issues for the issues and their ai_explanation. Never show unmasked personal data.
@@ -67,11 +64,11 @@ How to answer:
 - Team status: use lr_action_status for whether an action is OPEN, ACKNOWLEDGED, IN_PROGRESS or DONE, its owner and note (updated by teams in the Action Desk app on Lakebase).
 - Pricing: use gold_rate_adequacy for rate adequacy, bind ratio and proposed rate actions per segment.
 - One number: the 7-day, 30-day and year-to-date loss ratio of a segment always come from v_loss_ratio_watchlist (lr_7d, lr_30d, lr_ytd)
-  or the mv_loss_ratio metric view. Never answer a loss-ratio question from gold_rate_adequacy.loss_ratio_30d or gold_daily_loss_run_lf;
-  those are pipeline reconciliation inputs, not the governed number.
+  or the mv_loss_ratio metric view. Never answer a loss-ratio question from gold_rate_adequacy.loss_ratio_30d.
 """
 
 SAMPLE_QUESTIONS = [
+    "Which data-quality checks failed today and why?",
     "Which lines of business are RED or AMBER on loss ratio today?",
     "Why did DACH Property loss ratio jump this week?",
     "Is UK & Ireland Motor deteriorating because of frequency or severity?",
@@ -80,7 +77,6 @@ SAMPLE_QUESTIONS = [
     "Show the 30-day loss ratio by line of business against target.",
 ]
 EXTENDED_QUESTIONS = [
-    "Which data-quality checks failed today and why?",
     "Which actions are still open for Reinsurance and who owns them?",
     "Where is the loss ratio above target with no rate increase?",
 ]
@@ -97,7 +93,7 @@ EXAMPLE_SQL = [
     ("What are the top causes of loss in the last 7 days?",
      f"SELECT line_of_business, region, cause_of_loss, event_tag, MEASURE(claim_count) AS claims, "
      f"MEASURE(incurred_loss) AS incurred FROM {fq('mv_loss_run')} "
-     f"WHERE report_date > (SELECT MAX(report_date) FROM {fq('claims')}) - INTERVAL 7 DAYS "
+     f"WHERE report_date > (SELECT MAX(report_date) FROM {fq('silver_claims')}) - INTERVAL 7 DAYS "
      f"GROUP BY ALL ORDER BY incurred DESC LIMIT 10"),
 ]
 
@@ -109,7 +105,7 @@ def serialized_space():
     tables.update(extra)
     questions = SAMPLE_QUESTIONS + (EXTENDED_QUESTIONS if extra else [])
     examples = list(EXAMPLE_SQL)
-    if "dq_daily_scorecard" in extra:
+    if True:  # the data-quality tables come from the pipeline (step 03)
         examples.append(("Which data-quality checks failed today and why?",
                          f"SELECT s.check_name, s.check_type, s.issues, s.pass_rate, ANY_VALUE(i.ai_explanation) AS example_explanation "
                          f"FROM {fq('dq_daily_scorecard')} s LEFT JOIN {fq('dq_claims_issues')} i USING (report_date, check_name) "

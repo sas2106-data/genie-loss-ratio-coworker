@@ -1,28 +1,19 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 02 · Governance: row filter by region and column mask on claim free text
+# MAGIC # 03 · Pipeline, silver: data-quality rules, governance and Gen AI checks
 # MAGIC
-# MAGIC The Lakeflow pipeline attaches these policies to the claims tables it publishes
-# MAGIC (`silver_claims`, `silver_claims_ai_checked`, see `pipeline/lrc_ingest_pipeline.sql`), and step 03 puts the row filter on the gold table:
+# MAGIC Adds `pipeline/02_silver.sql` to the pipeline and runs it. Before that, this notebook creates the Unity Catalog
+# MAGIC policy functions that the silver tables attach.
 # MAGIC
-# MAGIC | Policy | Function | Effect |
+# MAGIC | What | How | Where you see it |
 # MAGIC |---|---|---|
-# MAGIC | **Row filter** on `region` | `lrc_region_filter(region)` | A claims team sees only its own book: membership of a group listed in `lrc_region_access` for that region. Workspace admins (the pipeline owner) see all regions. |
-# MAGIC | **Column mask** on `loss_description` | `lrc_mask_free_text(s)` | GDPR: only members of `lrc_pii_readers` (and admins) see the raw text; everyone else sees it with emails, phone numbers and contact names redacted by `lrc_redact`. |
-# MAGIC
-# MAGIC Gen AI (`ai_mask`) finds personal data the regexes miss, such as names. The column mask *enforces* redaction for
-# MAGIC every query, on every surface (SQL, Genie, dashboards, Power BI DirectQuery), regardless of who wrote the query.
-# MAGIC
-# MAGIC Run it before steps 03 and 10, because both reference these functions.
+# MAGIC | Rule-based data quality | **expectations**: claim id present, report date not in the future, loss before report, no negative amounts, EUR only; de-duplication of resent claims | pipeline graph (expectation pass rates), `silver_claims`, `silver_premium` |
+# MAGIC | Governance | **row filter** by region (`lrc_region_filter`), **column mask** on the free text (`lrc_mask_free_text`) | `silver_claims` |
+# MAGIC | Gen AI data quality | `ai_classify` peril vs coded cause, `ai_mask` personal data, `ai_query` explains each issue and the fix, on at most `MAX_AI_CLAIMS` recent claims | `silver_claims_ai_checked`, `dq_claims_issues`, `dq_daily_scorecard` |
 
 # COMMAND ----------
 
-# MAGIC %run ./00_config
-
-# COMMAND ----------
-
-FQ = f"`{CATALOG}`.`{SCHEMA}`"
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {FQ}")
+# MAGIC %run ./00_setup
 
 # COMMAND ----------
 
@@ -78,8 +69,35 @@ print("policy functions ready")
 
 # COMMAND ----------
 
-# MAGIC %md ## 3 · What the policies do (evidence)
-# MAGIC Left: the raw text an authorised reader sees. Right: what any other analyst, Genie user or Power BI report sees.
+# MAGIC %md ## 3 · Add `pipeline/02_silver.sql` to the pipeline and run it
+
+# COMMAND ----------
+
+# MAGIC %run ./_pipeline
+
+# COMMAND ----------
+
+run_pipeline(["bronze", "silver"])
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 4 · What the data-quality checks found
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+  SELECT check_name, check_type, SUM(issues) AS claims_with_issue, ROUND(AVG(pass_rate), 4) AS avg_pass_rate
+  FROM {FQ}.dq_daily_scorecard GROUP BY ALL ORDER BY claims_with_issue DESC"""))
+display(spark.sql(f"""
+  SELECT check_name, claim_id, line_of_business, region, cause_of_loss, ai_peril, ai_explanation
+  FROM {FQ}.dq_claims_issues WHERE check_type = 'Gen AI' LIMIT 10"""))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 5 · What the policies do
+# MAGIC Left: the raw text an authorised reader sees. Right: what any other analyst, Genie user or report sees.
 
 # COMMAND ----------
 
@@ -94,7 +112,7 @@ if spark.catalog.tableExists(f"{CATALOG}.{SCHEMA}.silver_claims"):
 
 # COMMAND ----------
 
-# MAGIC %md ## 4 · Policies attached in Unity Catalog
+# MAGIC %md ## 6 · Policies attached in Unity Catalog
 
 # COMMAND ----------
 
