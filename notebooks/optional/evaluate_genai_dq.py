@@ -34,14 +34,14 @@ SAMPLE = 40  # explanations graded by the LLM judge
 spark.sql(f"""
 CREATE OR REPLACE TEMP VIEW genai_scored AS
 SELECT a.claim_id, a.report_date, a.cause_of_loss AS coded_cause, c.cause_of_loss AS source_cause, a.ai_peril,
-       s.loss_description, a.loss_description_masked,
+       a.loss_description, a.loss_description_masked,
        a.cause_of_loss <> c.cause_of_loss                                   AS truth_peril_mismatch,
        NOT a.peril_consistent                                               AS flag_peril_mismatch,
-       s.loss_description RLIKE '@example\\\\.com|\\\\+44 7700'             AS truth_pii,
+       a.loss_description RLIKE '@example\\\\.com|\\\\+44 7700'             AS truth_pii,
        a.pii_detected                                                       AS flag_pii
-FROM {FQ}.silver_claims_ai_checked a
+FROM {FQ}.silver_claims a
 JOIN {FQ}.truth_claims c USING (claim_id)
-JOIN {FQ}.silver_claims s USING (claim_id)
+WHERE a.genai_checked
 """)
 display(spark.sql("SELECT * EXCEPT (loss_description) FROM genai_scored WHERE truth_peril_mismatch OR flag_peril_mismatch OR truth_pii OR flag_pii LIMIT 50"))
 

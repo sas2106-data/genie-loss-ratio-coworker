@@ -40,6 +40,8 @@ def run_pipeline(layers):
         if state in ("COMPLETED", "FAILED", "CANCELED"):
             break
         time.sleep(15)
+    global LAST_UPDATE_ID
+    LAST_UPDATE_ID = update_id
     print(f"update {update_id}: {state}")
     assert state == "COMPLETED", "Open the pipeline link above to see which table failed"
     return pid
